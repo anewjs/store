@@ -182,7 +182,7 @@ createStore({
 
 ```js
 // stores/counter.js
-import { createStore } from 'anew'
+import { createStore } from '@anew/store'
 
 export const counterStore = createStore({
     name: 'counter',
@@ -275,7 +275,7 @@ counterStore.dispatch.batch.done()
 ### Example: With User Defined Reducer
 
 ```js
-import { createStore } from 'anew'
+import { createStore } from '@anew/store'
 import { routerReducer, routerActions } from 'react-router-redux'
 
 export const routerStore = createStore({
@@ -334,7 +334,7 @@ combineStores({
 
 ```js
 // app/store.js
-import { combineStores } from 'anew'
+import { combineStores } from '@anew/store'
 import counterStore from 'stores/counter'
 
 const rootStore = combineStores({
@@ -374,7 +374,7 @@ createTestEnv(store)
 
 ```js
 // test/stores/counter.test.js
-import { createTestEnv } from 'anew'
+import { createTestEnv } from '@anew/store'
 import counterStore from 'stores/counter'
 
 const newTestEnv = createTestEnv(counterStore)
@@ -412,7 +412,7 @@ This is merely a recommendation for how you could structure your anew applicatio
 ```js
 // /stores/index.js
 
-import { combineStores } from 'anew'
+import { combineStores } from '@anew/store'
 
 /**
  | ------------------
@@ -443,7 +443,7 @@ export default combineStores({
 ```js
 // /stores/someStore/someStore.js
 
-import { createStore } from 'anew'
+import { createStore } from '@anew/store'
 
 import state from './someStore.state'
 import * as reducers from './someStore.reducers'
