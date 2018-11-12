@@ -182,7 +182,7 @@ createStore({
 
 ```js
 // stores/counter.js
-import { createStore } from '@anew/store'
+import createStore from '@anew/store'
 
 export const counterStore = createStore({
     name: 'counter',
@@ -275,7 +275,7 @@ counterStore.dispatch.batch.done()
 ### Example: With User Defined Reducer
 
 ```js
-import { createStore } from '@anew/store'
+import createStore from '@anew/store'
 import { routerReducer, routerActions } from 'react-router-redux'
 
 export const routerStore = createStore({
@@ -334,13 +334,47 @@ combineStores({
 
 ```js
 // app/store.js
-import { combineStores } from '@anew/store'
-import counterStore from 'stores/counter'
+import createStore, { combineStores } from '@anew/store'
+
+const counterStore = createStore({
+    name: 'counter',
+
+    state: {
+        count: 0,
+    },
+
+    reducers: {
+        increment: state => ({
+            count: state.count + 1,
+        }),
+    },
+})
+
+// Notice, the combination will
+// take care of store creation if
+// the store has not already been
+// created. However, this store
+// can not be used directly since the
+// store creation happens within the combination
+// and is not exposed to the application.
+const otherStore = {
+    name: 'other',
+
+    state: {
+        someBool: false,
+    },
+
+    reducer: {
+        toggle: state => ({
+            someBool: !state.someBool,
+        }),
+    },
+}
 
 const rootStore = combineStores({
     name: 'root',
 
-    stores: [counterStore],
+    stores: [counterStore, otherStore],
 })
 
 // returns: { counter: { count: 0 } }
@@ -350,7 +384,7 @@ rootStore.getState()
 rootStore.dispatch.reducers.counter.increment(1)
 
 // new state tree: { counter: { count: 10 } }
-rootStore.dispatch({ type: 'counter:inc', payload: [9] })
+rootStore.dispatch({ type: 'counter:increment', payload: [9] })
 
 // After Combination using `counterStore`
 // new state tree: { counter: { count: 11 } }
@@ -443,7 +477,7 @@ export default combineStores({
 ```js
 // /stores/someStore/someStore.js
 
-import { createStore } from '@anew/store'
+import createStore from '@anew/store'
 
 import state from './someStore.state'
 import * as reducers from './someStore.reducers'
