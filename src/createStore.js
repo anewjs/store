@@ -39,6 +39,14 @@ export default function createStore(
 ) {
     invariantFunctionProperty(name, 'store creation')
 
+    invariant(
+        typeof reducer !== 'object',
+        `Wrong type "reducer" was passed as an object instead of a function ` +
+            `for the store named "${name}". It seems like you accidentally ` +
+            `spelled reducers as reducer. The reducer parameter can only be a ` +
+            `function, recieved an object instead.`
+    )
+
     /**
      * Create Object to preserve reference
      */
