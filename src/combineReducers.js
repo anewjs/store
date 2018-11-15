@@ -1,8 +1,9 @@
-import { combineReducers as reduxCombineReducers } from 'redux'
 import { persistCombineReducers } from 'redux-persist'
+import { combineReducers as reduxCombineReducers } from 'redux'
+
+import ActionTypes from './actionTypes'
 import createPersistConfig from './createPersistConfig'
 import createStore from './createStore'
-import ActionTypes from './actionTypes'
 import isStoreCreated from './isStoreCreated'
 
 export default function combineReducers(anewStore, stores, persist) {
@@ -45,10 +46,10 @@ export default function combineReducers(anewStore, stores, persist) {
                         state,
                     })
                 }
-
-                return state
             default:
-                return combinedReducer(state, action)
+                state = combinedReducer(state, action)
         }
+
+        return anewStore.setState(state)
     }
 }

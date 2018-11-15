@@ -1,10 +1,18 @@
+import { createStore } from 'redux'
 import { persistStore } from 'redux-persist'
 
 /**
- * Create persist store as a property inside the redux store
- * @return { Object } Redux Store Object Shape
+ * Create Redux Store with Third Party Extensions
+ *
+ * @param  {Function}       reducer Reducer Function
+ * @param  {Any}            state     Store Initial State
+ * @param  {Function}       enhancer  Redux Store Enhancer
+ * @param  {Object|Boolean} persist   Persist Conifg
+ * @return {Object}         Anew Store Object
  */
-export default function createPersistStore(persist, reduxStore) {
+export default function createReduxStore(reducer, state, enhancer, persist) {
+    const reduxStore = createStore(reducer, state, enhancer)
+
     if (persist) {
         const persistor = persistStore(reduxStore)
         const { dispatch, getState } = persistor

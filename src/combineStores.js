@@ -1,16 +1,13 @@
-import { createStore as defaultCreateReduxStore } from 'redux'
 import { applyMiddleware as defaultApplyMiddleware } from 'redux'
+
+import ActionTypes from './actionTypes'
 import defaultCombineReducers from './combineReducers'
 import defaultCreateBatch from './createBatch'
 import defaultCreateBatchMiddleware from './createBatchMiddleware'
-import defaultCreateCombinedReducer from './createCombinedReducer'
 import defaultCreateReduxAnewProps from './createReduxAnewProps'
+import defaultCreateReduxStore from './createReduxStore'
 import defaultCreateSetState from './createSetState'
-import defaultCreatePersistStore from './createPersistStore'
-
-import invariant from 'invariant'
 import invariantFunctionProperty from './invariantFunctionProperty'
-import ActionTypes from './actionTypes'
 
 export default function combineStores(
     { name = 'combinedStore', stores = [], persist, enhancer },
@@ -18,10 +15,8 @@ export default function combineStores(
         combineReducers = defaultCombineReducers,
         createBatch = defaultCreateBatch,
         createBatchMiddleware = defaultCreateBatchMiddleware,
-        createCombinedReducer = defaultCreateCombinedReducer,
         createReduxAnewProps = defaultCreateReduxAnewProps,
         createSetState = defaultCreateSetState,
-        createPersistStore = defaultCreatePersistStore,
         createReduxStore = defaultCreateReduxStore,
         applyMiddleware = defaultApplyMiddleware,
     } = {}
@@ -36,6 +31,7 @@ export default function combineStores(
         state: {},
         reducers: {},
         batches: [],
+        type: 'combined',
     }
 
     /**
@@ -44,14 +40,9 @@ export default function combineStores(
     anewStore.setState = createSetState(anewStore)
 
     /**
-     * Combine Redux Store
-     */
-    let reduxReducer = combineReducers(anewStore, stores, persist)
-
-    /**
      * Generate Combined Anew Store
      */
-    const anewReducer = createCombinedReducer(anewStore, reduxReducer)
+    const anewReducer = combineReducers(anewStore, stores, persist)
 
     /**
      * Create getBatches for early reference
@@ -69,8 +60,7 @@ export default function combineStores(
      * Redux Store
      * @type { Object }
      */
-    const store = createWithMiddlewares(anewReducer, anewStore.state, enhancer)
-    const reduxStore = createPersistStore(persist, store)
+    const reduxStore = createWithMiddlewares(anewReducer, anewStore.state, enhancer, persist)
 
     /**
      * Create anew specific store props

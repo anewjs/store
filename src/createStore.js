@@ -1,16 +1,15 @@
-import { createStore as defaultCreateReduxStore } from 'redux'
 import { bindActionCreators as defaultBindActionCreators } from 'redux'
 import { createSelector as defaultCreateSelector } from 'reselect'
+import invariant from 'invariant'
 
+import defaultCreateAnewSelector from './createAnewSelector'
 import defaultCreateBatch from './createBatch'
 import defaultCreateReducer from './createReducer'
 import defaultCreateReduxAnewProps from './createReduxAnewProps'
+import defaultCreateReduxStore from './createReduxStore'
 import defaultCreateSetState from './createSetState'
-import defaultCreateAnewSelector from './createAnewSelector'
-import defaultCreatePersistStore from './createPersistStore'
-
-import invariant from 'invariant'
 import invariantFunctionProperty from './invariantFunctionProperty'
+import invariantPersistState from './invariantPersistState'
 import reservedReducerNames from './reservedReducerNames'
 
 export default function createStore(
@@ -24,21 +23,20 @@ export default function createStore(
         persist,
         reducer,
         enhancer,
-    },
+    } = {},
     {
+        createReduxStore = defaultCreateReduxStore,
         createBatch = defaultCreateBatch,
         createReducer = defaultCreateReducer,
         createReduxAnewProps = defaultCreateReduxAnewProps,
         createSetState = defaultCreateSetState,
         createAnewSelector = defaultCreateAnewSelector,
-        createPersistStore = defaultCreatePersistStore,
         createSelector = defaultCreateSelector,
-        createReduxStore = defaultCreateReduxStore,
         bindActionCreators = defaultBindActionCreators,
     } = {}
 ) {
+    invariantPersistState(name, state, persist)
     invariantFunctionProperty(name, 'store creation')
-
     invariant(
         typeof reducer !== 'object',
         `Wrong type "reducer" was passed as an object instead of a function ` +
@@ -58,6 +56,7 @@ export default function createStore(
         selectors,
         effects: { ...effects },
         batches: [],
+        type: 'single',
     }
 
     /**
@@ -81,8 +80,7 @@ export default function createStore(
      * Redux Store
      * @type { Object }
      */
-    const store = createReduxStore(anewReducer, anewStore.state, enhancer)
-    const reduxStore = createPersistStore(persist, store)
+    const reduxStore = createReduxStore(anewReducer, anewStore.state, enhancer, persist)
 
     /**
      * Create anew specific store props

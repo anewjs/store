@@ -21,7 +21,7 @@ export default function createSetState(anewStore) {
     }
 
     return function setState(stateChange) {
-        if (stateChange !== anewStore.state) {
+        if (!!stateChange && stateChange !== anewStore.state) {
             anewStore.state = stateChange
         }
 
