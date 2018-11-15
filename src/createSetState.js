@@ -5,8 +5,7 @@ export default function createSetState(anewStore) {
         /**
          * Clean up state tree
          */
-        const { __esModule, ...state } = anewStore.state
-        anewStore.state = state
+        delete anewStore.state.__esModule
 
         return function setState(stateChange) {
             if (!!stateChange && stateChange !== anewStore.state) {

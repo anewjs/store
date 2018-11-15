@@ -1,3 +1,3 @@
 export default function isStoreCreated(store) {
-    return !!store.getState
+    return !!(store && store.getState)
 }

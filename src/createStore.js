@@ -1,9 +1,10 @@
-import { bindActionCreators as defaultBindActionCreators } from 'redux'
+import { applyMiddleware, compose, bindActionCreators as defaultBindActionCreators } from 'redux'
 import { createSelector as defaultCreateSelector } from 'reselect'
 import invariant from 'invariant'
 
 import defaultCreateAnewSelector from './createAnewSelector'
 import defaultCreateBatch from './createBatch'
+import defaultCreateBatchMiddleware from './createBatchMiddleware'
 import defaultCreateReducer from './createReducer'
 import defaultCreateReduxAnewProps from './createReduxAnewProps'
 import defaultCreateReduxStore from './createReduxStore'
@@ -27,6 +28,7 @@ export default function createStore(
     {
         createReduxStore = defaultCreateReduxStore,
         createBatch = defaultCreateBatch,
+        createBatchMiddleware = defaultCreateBatchMiddleware,
         createReducer = defaultCreateReducer,
         createReduxAnewProps = defaultCreateReduxAnewProps,
         createSetState = defaultCreateSetState,
@@ -77,16 +79,29 @@ export default function createStore(
     const anewReducer = createReducer(anewStore, reducer, persist)
 
     /**
-     * Redux Store
-     * @type { Object }
-     */
-    const reduxStore = createReduxStore(anewReducer, anewStore.state, enhancer, persist)
-
-    /**
      * Create anew specific store props
      * @type { Object }
      */
-    reduxStore.anew = createReduxAnewProps(anewStore, anewReducer)
+    const anewProps = createReduxAnewProps(anewStore, anewReducer)
+
+    /**
+     * Create Batch Middleware with reference to batches
+     */
+    const enhancerWithMiddlewares = compose(
+        ...(enhancer ? [enhancer] : []),
+        applyMiddleware(createBatchMiddleware(anewProps.getBatches))
+    )
+
+    /**
+     * Redux Store
+     * @type { Object }
+     */
+    const reduxStore = createReduxStore(
+        anewReducer,
+        anewStore.state,
+        enhancerWithMiddlewares,
+        persist
+    )
 
     /**
      * Extend Dispatcher to include reducers, effects, and batch.
@@ -118,6 +133,8 @@ export default function createStore(
     reduxStore.dispatch.actions = {}
     reduxStore.dispatch.batch = createBatch(reduxStore)
 
+    reduxStore.anew = anewProps
+
     /**
      * Transfer redux store dispatch methods.
      * Avoid referencing for dispatch and batch as their references
@@ -141,24 +158,24 @@ export default function createStore(
     }
 
     Object.entries(selectors).forEach(([selectorName, selectorCreator]) => {
-        invariantFunctionProperty(selectorName, name)
+        if (invariantFunctionProperty(selectorName, name)) {
+            function selectorWithParams(...payload) {
+                if (!selectorParams.core && reduxStore.anew.core) {
+                    selectorParams.core = reduxStore.anew.core.getState
+                }
 
-        function selectorWithParams(...payload) {
-            if (!selectorParams.core && reduxStore.anew.core) {
-                selectorParams.core = reduxStore.anew.core.getState
+                const selector = selectorCreator(selectorParams)
+                const { ref, value } = selector(...payload)
+
+                reduxStore.getState[selectorName] = ref
+                anewStore.select[selectorName] = ref
+
+                return value
             }
 
-            const selector = selectorCreator(selectorParams)
-            const { ref, value } = selector(...payload)
-
-            reduxStore.getState[selectorName] = ref
-            anewStore.select[selectorName] = ref
-
-            return value
+            reduxStore.getState[selectorName] = selectorWithParams
+            anewStore.select[selectorName] = selectorWithParams
         }
-
-        reduxStore.getState[selectorName] = selectorWithParams
-        anewStore.select[selectorName] = selectorWithParams
     })
 
     /**

@@ -6,13 +6,11 @@ export default function createBatchMiddleware(getBatches) {
             const batches = getBatches()
             const len = batches.length
 
-            if (action.type !== ActionTypes.BATCH && !!len) {
+            if (action && action.type !== ActionTypes.BATCH && !!len) {
                 dispatch({
                     type: ActionTypes.BATCH,
                     payload: batches.splice(0, len),
                 })
-
-                return next(action)
             }
 
             return next(action)

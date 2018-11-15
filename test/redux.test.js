@@ -9,8 +9,8 @@ import barStore from './stores/bar'
 
 const noop = () => {}
 
-describe('createStore', () => {
-    it('exposes the public API', () => {
+describe('redux createStore', () => {
+    test('exposes the public API', () => {
         const store = createStore()
         const methods = Object.keys(store)
 
@@ -29,7 +29,7 @@ describe('createStore', () => {
         expect(anewMethods).toContain('name')
     })
 
-    it('throws if reducer is not a function', () => {
+    test('throws if reducer is not a function', () => {
         const injectReducer = reducer => ({
             reducers: { reducer },
         })
@@ -39,7 +39,7 @@ describe('createStore', () => {
         expect(() => createStore(injectReducer(() => {}))).not.toThrow()
     })
 
-    it('passes the initial state', () => {
+    test('passes the initial state', () => {
         const store = createStore({
             state: todoStore.reducers.addTodo([], 'Hello'),
         })
@@ -52,7 +52,7 @@ describe('createStore', () => {
         ])
     })
 
-    it('applies the reducer to the previous state', () => {
+    test('applies the reducer to the previous state', () => {
         const store = createStore(todoStore)
 
         expect(store.getState()).toEqual([])
@@ -81,7 +81,7 @@ describe('createStore', () => {
         ])
     })
 
-    it('applies the reducer to the initial state', () => {
+    test('applies the reducer to the initial state', () => {
         const store = createStore({
             ...todoStore,
             state: todoStore.reducers.addTodo([], 'Hello'),
@@ -115,7 +115,7 @@ describe('createStore', () => {
         ])
     })
 
-    it('supports multiple subscriptions', () => {
+    test('supports multiple subscriptions', () => {
         const store = createStore(todoStore)
         const listenerA = jest.fn()
         const listenerB = jest.fn()
@@ -162,7 +162,7 @@ describe('createStore', () => {
         expect(listenerB.mock.calls.length).toBe(2)
     })
 
-    it('only removes listener once when unsubscribe is called', () => {
+    test('only removes listener once when unsubscribe is called', () => {
         const store = createStore(todoStore)
         const listenerA = jest.fn()
         const listenerB = jest.fn()
@@ -178,7 +178,7 @@ describe('createStore', () => {
         expect(listenerB.mock.calls.length).toBe(1)
     })
 
-    it('only removes relevant listener when unsubscribe is called', () => {
+    test('only removes relevant listener when unsubscribe is called', () => {
         const store = createStore(todoStore)
         const listener = jest.fn()
 
@@ -192,7 +192,7 @@ describe('createStore', () => {
         expect(listener.mock.calls.length).toBe(1)
     })
 
-    it('supports removing a subscription within a subscription', () => {
+    test('supports removing a subscription within a subscription', () => {
         const store = createStore(todoStore)
         const listenerA = jest.fn()
         const listenerB = jest.fn()
@@ -213,7 +213,7 @@ describe('createStore', () => {
         expect(listenerC.mock.calls.length).toBe(2)
     })
 
-    it('notifies all subscribers about current dispatch regardless if any of them gets unsubscribed in the process', () => {
+    test('notifies all subscribers about current dispatch regardless if any of them gets unsubscribed in the process', () => {
         const store = createStore(todoStore)
 
         const unsubscribeHandles = []
@@ -243,7 +243,7 @@ describe('createStore', () => {
         expect(listener3.mock.calls.length).toBe(1)
     })
 
-    it('notifies only subscribers active at the moment of current dispatch', () => {
+    test('notifies only subscribers active at the moment of current dispatch', () => {
         const store = createStore(todoStore)
 
         const listener1 = jest.fn()
@@ -275,7 +275,7 @@ describe('createStore', () => {
         expect(listener3.mock.calls.length).toBe(1)
     })
 
-    it('uses the last snapshot of subscribers during nested dispatch', () => {
+    test('uses the last snapshot of subscribers during nested dispatch', () => {
         const store = createStore(todoStore)
 
         const listener1 = jest.fn()
@@ -317,7 +317,7 @@ describe('createStore', () => {
         expect(listener4.mock.calls.length).toBe(1)
     })
 
-    it('provides an up-to-date state when a subscriber is notified', done => {
+    test('provides an up-to-date state when a subscriber is notified', done => {
         const store = createStore(todoStore)
         store.subscribe(() => {
             expect(store.getState()).toEqual([
@@ -331,7 +331,7 @@ describe('createStore', () => {
         store.dispatch.reducers.addTodo('Hello')
     })
 
-    it('does not leak private listeners array', done => {
+    test('does not leak private listeners array', done => {
         const store = createStore(todoStore)
         store.subscribe(function() {
             expect(this).toBe(undefined)
@@ -340,7 +340,7 @@ describe('createStore', () => {
         store.dispatch.reducers.addTodo('Hello')
     })
 
-    it('only accepts plain object actions', () => {
+    test('only accepts plain object actions', () => {
         const store = createStore(todoStore)
         expect(() => store.dispatch({ type: 'UNKNOWN' })).not.toThrow()
 
@@ -350,7 +350,7 @@ describe('createStore', () => {
         )
     })
 
-    it('handles nested dispatches gracefully', () => {
+    test('handles nested dispatches gracefully', () => {
         const store = combineStores({
             stores: [fooStore, barStore],
         })
@@ -370,25 +370,25 @@ describe('createStore', () => {
         })
     })
 
-    it('does not allow dispatch() from within a reducer', () => {
+    test('does not allow dispatch() from within a reducer', () => {
         const dispatch = storeInReducer(foo => foo.dispatch({ type: 'UNKNOWN' }))
 
         expect(dispatch).toThrow(/may not dispatch/)
     })
 
-    it('does not allow getState() from within a reducer', () => {
+    test('does not allow getState() from within a reducer', () => {
         const dispatch = storeInReducer(foo => foo.getState())
 
         expect(dispatch).toThrow(/You may not call store.getState()/)
     })
 
-    it('does not allow subscribe() from within a reducer', () => {
+    test('does not allow subscribe() from within a reducer', () => {
         const dispatch = storeInReducer(foo => foo.subscribe(noop))
 
         expect(dispatch).toThrow(/You may not call store.subscribe()/)
     })
 
-    it('does not allow unsubscribe from subscribe() from within a reducer', () => {
+    test('does not allow unsubscribe from subscribe() from within a reducer', () => {
         const dispatch = storeInReducer(
             (foo, unsubscribe) => unsubscribe(),
             foo => foo.subscribe(noop)
@@ -397,21 +397,21 @@ describe('createStore', () => {
         expect(dispatch).toThrow(/You may not unsubscribe from a store/)
     })
 
-    it('throws if action type is missing', () => {
+    test('throws if action type is missing', () => {
         const store = createStore(todoStore)
         expect(() => store.dispatch({})).toThrow(
             /Actions may not have an undefined "type" property/
         )
     })
 
-    it('throws if action type is undefined', () => {
+    test('throws if action type is undefined', () => {
         const store = createStore(todoStore)
         expect(() => store.dispatch({ type: undefined })).toThrow(
             /Actions may not have an undefined "type" property/
         )
     })
 
-    it('does not throw if action type is falsy', () => {
+    test('does not throw if action type is falsy', () => {
         const store = createStore(todoStore)
         expect(() => store.dispatch({ type: false })).not.toThrow()
         expect(() => store.dispatch({ type: 0 })).not.toThrow()
@@ -419,7 +419,7 @@ describe('createStore', () => {
         expect(() => store.dispatch({ type: '' })).not.toThrow()
     })
 
-    it('accepts enhancer as argument', () => {
+    test('accepts enhancer as argument', () => {
         const emptyArray = []
         const spyEnhancer = vanillaCreateStore => (...args) => {
             expect(args[1]).toEqual(emptyArray)
@@ -447,58 +447,7 @@ describe('createStore', () => {
         ])
     })
 
-    it('throws if enhancer is neither undefined nor a function', () => {
-        expect(() =>
-            createStore({
-                ...todoStore,
-                enhancer: {},
-            })
-        ).toThrow()
-
-        expect(() =>
-            createStore({
-                ...todoStore,
-                enhancer: [],
-            })
-        ).toThrow()
-
-        expect(() =>
-            createStore({
-                ...todoStore,
-                enhancer: null,
-            })
-        ).toThrow()
-
-        expect(() =>
-            createStore({
-                ...todoStore,
-                enhancer: false,
-            })
-        ).toThrow()
-
-        expect(() =>
-            createStore({
-                ...todoStore,
-                enhancer: undefined,
-            })
-        ).not.toThrow()
-
-        expect(() =>
-            createStore({
-                ...todoStore,
-                enhancer: x => x,
-            })
-        ).not.toThrow()
-
-        expect(() =>
-            createStore({
-                ...todoStore,
-                enhancer: x => x,
-            })
-        ).not.toThrow()
-    })
-
-    it('throws if nextReducer is not a function', () => {
+    test('throws if nextReducer is not a function', () => {
         const store = createStore(todoStore)
 
         expect(() => store.replaceReducer()).toThrow('Expected the nextReducer to be a function.')
@@ -506,7 +455,7 @@ describe('createStore', () => {
         expect(() => store.replaceReducer(noop)).not.toThrow()
     })
 
-    it('throws if listener is not a function', () => {
+    test('throws if listener is not a function', () => {
         const store = createStore(todoStore)
 
         expect(() => store.subscribe()).toThrow()
@@ -519,19 +468,19 @@ describe('createStore', () => {
     })
 
     describe('Symbol.observable interop point', () => {
-        it('should exist', () => {
+        test('should exist', () => {
             const store = createStore(todoStore)
             expect(typeof store[$$observable]).toBe('function')
         })
 
         describe('returned value', () => {
-            it('should be subscribable', () => {
+            test('should be subscribable', () => {
                 const store = createStore(todoStore)
                 const obs = store[$$observable]()
                 expect(typeof obs.subscribe).toBe('function')
             })
 
-            it('should throw a TypeError if an observer object is not supplied to subscribe', () => {
+            test('should throw a TypeError if an observer object is not supplied to subscribe', () => {
                 const store = createStore(todoStore)
                 const obs = store[$$observable]()
 
@@ -552,7 +501,7 @@ describe('createStore', () => {
                 }).not.toThrow()
             })
 
-            it('should return a subscription object when subscribed', () => {
+            test('should return a subscription object when subscribed', () => {
                 const store = createStore(todoStore)
                 const obs = store[$$observable]()
                 const sub = obs.subscribe({})
@@ -560,7 +509,7 @@ describe('createStore', () => {
             })
         })
 
-        it('should pass an integration test with no unsubscribe', () => {
+        test('should pass an integration test with no unsubscribe', () => {
             const store = combineStores({
                 stores: [fooStore, barStore],
             })
@@ -580,7 +529,7 @@ describe('createStore', () => {
             expect(results).toEqual([{ foo: 0, bar: 0 }, { foo: 1, bar: 0 }, { foo: 1, bar: 2 }])
         })
 
-        it('should pass an integration test with an unsubscribe', () => {
+        test('should pass an integration test with an unsubscribe', () => {
             const store = combineStores({
                 stores: [fooStore, barStore],
             })

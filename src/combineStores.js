@@ -1,4 +1,4 @@
-import { applyMiddleware as defaultApplyMiddleware } from 'redux'
+import { compose, applyMiddleware } from 'redux'
 
 import ActionTypes from './actionTypes'
 import defaultCombineReducers from './combineReducers'
@@ -18,7 +18,6 @@ export default function combineStores(
         createReduxAnewProps = defaultCreateReduxAnewProps,
         createSetState = defaultCreateSetState,
         createReduxStore = defaultCreateReduxStore,
-        applyMiddleware = defaultApplyMiddleware,
     } = {}
 ) {
     invariantFunctionProperty(name, 'store combination')
@@ -45,33 +44,29 @@ export default function combineStores(
     const anewReducer = combineReducers(anewStore, stores, persist)
 
     /**
-     * Create getBatches for early reference
+     * Create anew specific store props
+     * @type { Object }
      */
-    let getBatches = () => anewStore.batches
+    const anewProps = createReduxAnewProps(anewStore, anewReducer)
 
     /**
      * Create Batch Middleware with reference to batches
      */
-    const createWithMiddlewares = applyMiddleware(createBatchMiddleware(getBatches))(
-        createReduxStore
+    const enhancerWithMiddlewares = compose(
+        ...(enhancer ? [enhancer] : []),
+        applyMiddleware(createBatchMiddleware(anewProps.getBatches))
     )
 
     /**
      * Redux Store
      * @type { Object }
      */
-    const reduxStore = createWithMiddlewares(anewReducer, anewStore.state, enhancer, persist)
-
-    /**
-     * Create anew specific store props
-     * @type { Object }
-     */
-    reduxStore.anew = createReduxAnewProps(anewStore, anewReducer)
-
-    /**
-     * Update getBatches Reference
-     */
-    getBatches = () => reduxStore.anew.getBatches()
+    const reduxStore = createReduxStore(
+        anewReducer,
+        anewStore.state,
+        enhancerWithMiddlewares,
+        persist
+    )
 
     /**
      * Extend Dispatcher to include reducers, effects, and batch
@@ -83,6 +78,8 @@ export default function combineStores(
     reduxStore.dispatch.effects = {}
     reduxStore.dispatch.actions = {}
     reduxStore.dispatch.batch = createBatch(reduxStore, 'combined')
+
+    reduxStore.anew = anewProps
 
     /**
      * Populate dispatch reducers and effects

@@ -1,5 +1,6 @@
 import { persistCombineReducers } from 'redux-persist'
 import { combineReducers as reduxCombineReducers } from 'redux'
+import invariant from 'invariant'
 
 import ActionTypes from './actionTypes'
 import createPersistConfig from './createPersistConfig'
@@ -14,13 +15,18 @@ export default function combineReducers(anewStore, stores, persist) {
         const storeCreated = isStoreCreated(store)
 
         if (!storeCreated) {
-            stores[i] = createStore(store)
+            invariant(
+                typeof store === 'object',
+                `No store provided for index "${i}" in the combined store "${anewStore.name}"`
+            )
+
+            store = stores[i] = createStore(store)
         }
 
         const {
             getState,
             anew: { name, reducer },
-        } = storeCreated ? store : stores[i]
+        } = store
 
         anewStore.state[name] = getState()
         anewStore.reducers[name] = reducer

@@ -6,7 +6,8 @@ import createPersistConfig from './createPersistConfig'
 import toAnewAction from './toAnewAction'
 
 export default function createReducer(anewStore, userReducer, persist) {
-    const { name, state: initalState } = anewStore
+    let { name, state: initalState } = anewStore
+
     const baseReducer = (reduxState, { type = '', payload = [], state: globalState = {} } = {}) => {
         const action = toAnewAction(type)
         const storeName = action[0]
@@ -20,16 +21,17 @@ export default function createReducer(anewStore, userReducer, persist) {
 
                         break
                     case BATCH:
-                        for (let i = 0, payloadLen = payload.length; i < payloadLen; i++) {
-                            reducer(reduxState, payload[i])
-                        }
+                        payload.forEach(batch => {
+                            baseReducer(reduxState, batch)
+                        })
 
                         break
                 }
             case PERSIST:
                 switch (reducerName) {
                     case REHYDRATE:
-                        anewStore.setState(payload[name])
+                        initalState = payload[name]
+                        anewStore.setState(initalState)
 
                         break
                 }
