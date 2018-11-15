@@ -1,5 +1,5 @@
 {
-    "name": "@anew/store",
+    "name": "@anew/store-beta",
     "version": "1.0.2",
     "description": "Anew State Manager",
     "main": "lib/index.js",
