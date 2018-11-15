@@ -5,14 +5,21 @@ import barStore from '../stores/bar'
 
 const foo = createStore(fooStore)
 
-export default function createWithStoreInReducer(reducer) {
+export default function createWithStoreInReducer(reducer, effect) {
     const bar = createStore({
         ...barStore,
+
         reducers: {
-            call: () => {
-                reducer(foo)
+            call: (state, result) => {
+                reducer(foo, result)
 
                 return barStore.reducers.call()
+            },
+        },
+
+        effects: {
+            call: ({ dispatch }) => {
+                dispatch.call(effect(foo))
             },
         },
     })
@@ -21,5 +28,5 @@ export default function createWithStoreInReducer(reducer) {
         stores: [foo, bar],
     })
 
-    return bar.dispatch.reducers.call
+    return effect ? bar.dispatch.effects.call : bar.dispatch.reducers.call
 }

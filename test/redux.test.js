@@ -1,11 +1,13 @@
-// Testers
+import { from } from 'rxjs'
+import { map } from 'rxjs/operators'
+import $$observable from 'symbol-observable'
 import createStore, { combineStores } from '../'
-
-// Helpers
 import storeInReducer from './helpers/storeInReducer'
-
-// Stores
 import todoStore from './stores/todo'
+import fooStore from './stores/foo'
+import barStore from './stores/bar'
+
+const noop = () => {}
 
 describe('createStore', () => {
     it('exposes the public API', () => {
@@ -349,28 +351,8 @@ describe('createStore', () => {
     })
 
     it('handles nested dispatches gracefully', () => {
-        const foo = {
-            name: 'foo',
-
-            state: 0,
-
-            reducers: {
-                call: state => 1,
-            },
-        }
-
-        const bar = {
-            name: 'bar',
-
-            state: 0,
-
-            reducers: {
-                call: state => 2,
-            },
-        }
-
         const store = combineStores({
-            stores: [foo, bar],
+            stores: [fooStore, barStore],
         })
 
         store.subscribe(function kindaComponentDidUpdate() {
@@ -398,5 +380,225 @@ describe('createStore', () => {
         const dispatch = storeInReducer(foo => foo.getState())
 
         expect(dispatch).toThrow(/You may not call store.getState()/)
+    })
+
+    it('does not allow subscribe() from within a reducer', () => {
+        const dispatch = storeInReducer(foo => foo.subscribe(noop))
+
+        expect(dispatch).toThrow(/You may not call store.subscribe()/)
+    })
+
+    it('does not allow unsubscribe from subscribe() from within a reducer', () => {
+        const dispatch = storeInReducer(
+            (foo, unsubscribe) => unsubscribe(),
+            foo => foo.subscribe(noop)
+        )
+
+        expect(dispatch).toThrow(/You may not unsubscribe from a store/)
+    })
+
+    it('throws if action type is missing', () => {
+        const store = createStore(todoStore)
+        expect(() => store.dispatch({})).toThrow(
+            /Actions may not have an undefined "type" property/
+        )
+    })
+
+    it('throws if action type is undefined', () => {
+        const store = createStore(todoStore)
+        expect(() => store.dispatch({ type: undefined })).toThrow(
+            /Actions may not have an undefined "type" property/
+        )
+    })
+
+    it('does not throw if action type is falsy', () => {
+        const store = createStore(todoStore)
+        expect(() => store.dispatch({ type: false })).not.toThrow()
+        expect(() => store.dispatch({ type: 0 })).not.toThrow()
+        expect(() => store.dispatch({ type: null })).not.toThrow()
+        expect(() => store.dispatch({ type: '' })).not.toThrow()
+    })
+
+    it('accepts enhancer as argument', () => {
+        const emptyArray = []
+        const spyEnhancer = vanillaCreateStore => (...args) => {
+            expect(args[1]).toEqual(emptyArray)
+            expect(args.length).toBe(2)
+            const vanillaStore = vanillaCreateStore(...args)
+            return {
+                ...vanillaStore,
+                dispatch: jest.fn(vanillaStore.dispatch),
+            }
+        }
+
+        const store = createStore({
+            ...todoStore,
+            enhancer: spyEnhancer,
+        })
+
+        const action = { type: 'todo:addTodo', payload: ['Hello'] }
+        store.dispatch(action)
+        expect(store.dispatch).toBeCalledWith(action)
+        expect(store.getState()).toEqual([
+            {
+                id: 1,
+                text: 'Hello',
+            },
+        ])
+    })
+
+    it('throws if enhancer is neither undefined nor a function', () => {
+        expect(() =>
+            createStore({
+                ...todoStore,
+                enhancer: {},
+            })
+        ).toThrow()
+
+        expect(() =>
+            createStore({
+                ...todoStore,
+                enhancer: [],
+            })
+        ).toThrow()
+
+        expect(() =>
+            createStore({
+                ...todoStore,
+                enhancer: null,
+            })
+        ).toThrow()
+
+        expect(() =>
+            createStore({
+                ...todoStore,
+                enhancer: false,
+            })
+        ).toThrow()
+
+        expect(() =>
+            createStore({
+                ...todoStore,
+                enhancer: undefined,
+            })
+        ).not.toThrow()
+
+        expect(() =>
+            createStore({
+                ...todoStore,
+                enhancer: x => x,
+            })
+        ).not.toThrow()
+
+        expect(() =>
+            createStore({
+                ...todoStore,
+                enhancer: x => x,
+            })
+        ).not.toThrow()
+    })
+
+    it('throws if nextReducer is not a function', () => {
+        const store = createStore(todoStore)
+
+        expect(() => store.replaceReducer()).toThrow('Expected the nextReducer to be a function.')
+
+        expect(() => store.replaceReducer(noop)).not.toThrow()
+    })
+
+    it('throws if listener is not a function', () => {
+        const store = createStore(todoStore)
+
+        expect(() => store.subscribe()).toThrow()
+
+        expect(() => store.subscribe('')).toThrow()
+
+        expect(() => store.subscribe(null)).toThrow()
+
+        expect(() => store.subscribe(undefined)).toThrow()
+    })
+
+    describe('Symbol.observable interop point', () => {
+        it('should exist', () => {
+            const store = createStore(todoStore)
+            expect(typeof store[$$observable]).toBe('function')
+        })
+
+        describe('returned value', () => {
+            it('should be subscribable', () => {
+                const store = createStore(todoStore)
+                const obs = store[$$observable]()
+                expect(typeof obs.subscribe).toBe('function')
+            })
+
+            it('should throw a TypeError if an observer object is not supplied to subscribe', () => {
+                const store = createStore(todoStore)
+                const obs = store[$$observable]()
+
+                expect(function() {
+                    obs.subscribe()
+                }).toThrowError(new TypeError('Expected the observer to be an object.'))
+
+                expect(function() {
+                    obs.subscribe(null)
+                }).toThrowError(new TypeError('Expected the observer to be an object.'))
+
+                expect(function() {
+                    obs.subscribe(() => {})
+                }).toThrowError(new TypeError('Expected the observer to be an object.'))
+
+                expect(function() {
+                    obs.subscribe({})
+                }).not.toThrow()
+            })
+
+            it('should return a subscription object when subscribed', () => {
+                const store = createStore(todoStore)
+                const obs = store[$$observable]()
+                const sub = obs.subscribe({})
+                expect(typeof sub.unsubscribe).toBe('function')
+            })
+        })
+
+        it('should pass an integration test with no unsubscribe', () => {
+            const store = combineStores({
+                stores: [fooStore, barStore],
+            })
+
+            const observable = store[$$observable]()
+            const results = []
+
+            observable.subscribe({
+                next(state) {
+                    results.push(state)
+                },
+            })
+
+            store.dispatch({ type: 'foo:call' })
+            store.dispatch({ type: 'bar:call' })
+
+            expect(results).toEqual([{ foo: 0, bar: 0 }, { foo: 1, bar: 0 }, { foo: 1, bar: 2 }])
+        })
+
+        it('should pass an integration test with an unsubscribe', () => {
+            const store = combineStores({
+                stores: [fooStore, barStore],
+            })
+
+            const observable = store[$$observable]()
+            const results = []
+
+            const sub = observable.subscribe({
+                next(state) {
+                    results.push(state)
+                },
+            })
+
+            store.dispatch({ type: 'foo:call' })
+            sub.unsubscribe()
+            store.dispatch({ type: 'bar:call' })
+
+            expect(results).toEqual([{ foo: 0, bar: 0 }, { foo: 1, bar: 0 }])
+        })
     })
 })
