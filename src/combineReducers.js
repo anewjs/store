@@ -53,7 +53,7 @@ export default function combineReducers(anewStore, stores, persist) {
                     })
                 }
             default:
-                state = combinedReducer(state, action)
+                state = combinedReducer(state, { ...action, state })
         }
 
         return anewStore.setState(state)

@@ -1,6 +1,6 @@
 import invariant from 'invariant'
 
-import createStore, { createTestEnv, ActionTypes } from '../'
+import createStore, { createTestEnv, ActionTypes } from '..'
 import counterStore from './stores/counter'
 
 jest.mock('invariant')

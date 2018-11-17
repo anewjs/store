@@ -147,7 +147,7 @@ export default function createStore(
     /**
      * Trasfer redux store getState methods
      */
-    anewStore.select = {}
+    anewStore.select = () => reduxStore.getState()
 
     /**
      * Populate getState selectors
@@ -257,11 +257,8 @@ export default function createStore(
             if (!effectParams.core && reduxStore.anew.core) {
                 const {
                     getState,
-                    firestore,
                     dispatch: { reducers, effects, actions, batch },
                 } = reduxStore.anew.core
-
-                effectParams.firestore = firestore
 
                 effectParams.core = {
                     select: getState,

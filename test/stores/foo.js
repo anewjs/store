@@ -6,4 +6,12 @@ export default {
     reducers: {
         call: state => 1,
     },
+
+    actions: {
+        call() {
+            return {
+                type: 'foo:call',
+            }
+        },
+    },
 }
