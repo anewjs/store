@@ -41,19 +41,23 @@ export default function combineReducers(anewStore, stores, persist) {
         ? persistCombineReducers(persist, anewStore.reducers)
         : reduxCombineReducers(anewStore.reducers)
 
-    return function combination(state = {}, action) {
-        switch (action.type) {
-            case ActionTypes.BATCH:
-                for (let i = 0, payloadLen = action.payload.length; i < payloadLen; i++) {
-                    const batchAction = action.payload[i]
+    return function combination(state, action) {
+        const { type, payload } = action
 
+        switch (type) {
+            case ActionTypes.BATCH:
+                payload.forEach(batch => {
                     state = combinedReducer(state, {
-                        ...batchAction,
+                        ...batch,
                         state,
                     })
-                }
+                })
+
+                break
             default:
                 state = combinedReducer(state, { ...action, state })
+
+                break
         }
 
         return anewStore.setState(state)

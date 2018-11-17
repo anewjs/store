@@ -306,4 +306,23 @@ describe('createStore', () => {
         expect(value4).toBe(4)
         expect(countDoubledAdd).toHaveBeenCalledTimes(2)
     })
+
+    test('one batch calls reducer once', () => {
+        const spyReducer = jest.fn(() => {})
+
+        const store = createStore({
+            ...counterStore,
+            reducer: spyReducer,
+        })
+
+        store.dispatch.batch.inc()
+        store.dispatch.batch.inc()
+        store.dispatch.batch.inc()
+        store.dispatch.batch.inc()
+        store.dispatch.batch.done()
+
+        // Once for initialization and the other for the batch
+        expect(spyReducer).toHaveBeenCalledTimes(2)
+        expect(store.getState()).toEqual({ count: 4 })
+    })
 })

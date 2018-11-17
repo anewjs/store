@@ -25,12 +25,10 @@ export default function composeReducers(anewStore, ...reducers) {
     switch (anewStore.type) {
         case 'combined':
             return (state, action) => {
-                action.state = anewStore.state
-
-                return anewStore.setState(extensionReducer(anewStore.state, action))
+                return anewStore.setState(extensionReducer(anewStore.state, { ...action, state }))
             }
         default:
-            return (state, action) => {
+            return (reduxState, action) => {
                 return anewStore.setState(extensionReducer(anewStore.state, action))
             }
     }

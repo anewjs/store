@@ -2,6 +2,7 @@ import { combineStores } from '..'
 import bar from './stores/bar'
 import counter from './stores/counter'
 import foo from './stores/foo'
+import list from './stores/list'
 
 jest.mock('invariant')
 
@@ -90,7 +91,7 @@ describe('combineStores', () => {
                             store.dispatch.inc()
                             store.effects.inc()
 
-                            expect(store.select.countDoubled()).toBe(10)
+                            expect(store.select.countDoubled()).toBe(8)
                         },
                     },
                 },
@@ -103,7 +104,7 @@ describe('combineStores', () => {
             foo: 0,
             bar: 0,
             counter: {
-                count: 5,
+                count: 4,
             },
         })
     })
@@ -315,5 +316,52 @@ describe('combineStores', () => {
         })
 
         store.dispatch.effects.bar.call()
+    })
+
+    test('batch equivalent to dispatch', () => {
+        const store1 = combineStores({
+            stores: [counter, list],
+        })
+
+        const store2 = combineStores({
+            stores: [counter, list],
+        })
+
+        // Dispatch
+        store1.dispatch.reducers.counter.inc()
+        store1.dispatch.reducers.counter.inc()
+        store1.dispatch.reducers.counter.inc()
+
+        // Batch
+        store2.dispatch.batch.counter.inc()
+        store2.dispatch.batch.counter.inc()
+        store2.dispatch.batch.counter.inc()
+        store2.dispatch.batch.counter.done()
+
+        expect(store1.getState()).toEqual(store2.getState())
+    })
+
+    test('mix equivalent to dispatch', () => {
+        const store1 = combineStores({
+            stores: [counter, list],
+        })
+
+        const store2 = combineStores({
+            stores: [counter, list],
+        })
+
+        // Dispatch
+        store1.dispatch.reducers.counter.inc()
+        store1.dispatch.reducers.counter.inc()
+        store1.dispatch.reducers.counter.inc()
+        store1.dispatch.reducers.counter.inc()
+
+        // Mix
+        store2.dispatch.batch.counter.inc()
+        store2.dispatch.reducers.counter.inc()
+        store2.dispatch.batch.counter.inc()
+        store2.dispatch.reducers.counter.inc()
+
+        expect(store1.getState()).toEqual(store2.getState())
     })
 })
