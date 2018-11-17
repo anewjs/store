@@ -26,6 +26,7 @@ yarn add @anew/store
 -   [Combining Stores](#combinestores)
 -   [Creating a Test Environment](#createtestenv)
 -   [Recommended Architecture](#recommend-file-structure)
+-   [Common Questions](#common-questions)
 
 ## `createStore`
 
@@ -577,4 +578,33 @@ export const someOtherEffect = ({ dispatch }, someAdvanced) => {
         dispatch.someToggleReducer(someAdvanced)
     }, 1000)
 }
+```
+
+## Common Questions
+
+> How reliable is @anew/store?
+
+There are over **1000 lines** of code thoroughly testing the `@anew/store` package. The package also passes all of the relevant redux tests used in the `redux` package. That being said, if you feel there are any issues with the package, please don't hesitate to create a **New Issue** in the _Issues_ tab above.
+
+> Can I use redux or a third party redux packages with @anew/store?
+
+Yes! `@anew/store` includes an optional traditional redux implementation. Store properties like `actions` and `reducer` where primarily made for that reason. You may for example use the `connected-react-router` redux package in the following way:
+
+```js
+import { connectRouter, routerActions } from 'connected-react-router'
+import createStore from '@anew/store'
+import createBrowserHistory from 'history/createBrowserHistory'
+
+const history = createBrowserHistory()
+
+export default createStore({
+    name: 'router',
+    actions: routerActions,
+    reducer: connectRouter(history),
+
+    // You may also use anew store properties
+    selectors: {...},
+    reducers: {...},
+    effects: {...},
+})
 ```
