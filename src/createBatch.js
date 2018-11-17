@@ -1,5 +1,5 @@
-import isPlainObject from './isPlainObject'
 import ActionTypes from './actionTypes'
+import isPlainObject from './isPlainObject'
 
 export default function createBatch(reduxStore, type) {
     let callReducer

@@ -1,8 +1,10 @@
-import { combineReducers as reduxCombineReducers } from 'redux'
 import { persistCombineReducers } from 'redux-persist'
+import { combineReducers as reduxCombineReducers } from 'redux'
+import invariant from 'invariant'
+
+import ActionTypes from './actionTypes'
 import createPersistConfig from './createPersistConfig'
 import createStore from './createStore'
-import ActionTypes from './actionTypes'
 import isStoreCreated from './isStoreCreated'
 
 export default function combineReducers(anewStore, stores, persist) {
@@ -13,13 +15,18 @@ export default function combineReducers(anewStore, stores, persist) {
         const storeCreated = isStoreCreated(store)
 
         if (!storeCreated) {
-            stores[i] = createStore(store)
+            invariant(
+                typeof store === 'object',
+                `No store provided for index "${i}" in the combined store "${anewStore.name}"`
+            )
+
+            store = stores[i] = createStore(store)
         }
 
         const {
             getState,
             anew: { name, reducer },
-        } = storeCreated ? store : stores[i]
+        } = store
 
         anewStore.state[name] = getState()
         anewStore.reducers[name] = reducer
@@ -34,21 +41,25 @@ export default function combineReducers(anewStore, stores, persist) {
         ? persistCombineReducers(persist, anewStore.reducers)
         : reduxCombineReducers(anewStore.reducers)
 
-    return function combination(state = {}, action) {
-        switch (action.type) {
-            case ActionTypes.BATCH:
-                for (let i = 0, payloadLen = action.payload.length; i < payloadLen; i++) {
-                    const batchAction = action.payload[i]
+    return function combination(state, action) {
+        const { type, payload } = action
 
+        switch (type) {
+            case ActionTypes.BATCH:
+                payload.forEach(batch => {
                     state = combinedReducer(state, {
-                        ...batchAction,
+                        ...batch,
                         state,
                     })
-                }
+                })
 
-                return state
+                break
             default:
-                return combinedReducer(state, action)
+                state = combinedReducer(state, { ...action, state })
+
+                break
         }
+
+        return anewStore.setState(state)
     }
 }

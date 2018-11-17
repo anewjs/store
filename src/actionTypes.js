@@ -2,7 +2,7 @@ export const DELIMITER = '@@'
 
 export const SEPERATOR = ':'
 
-export const PREFIX = `${DELIMITER}anew`
+export const PREFIX = 'anew'
 
 export const BATCH = 'BATCH'
 
@@ -13,6 +13,6 @@ export const PERSIST = 'persist'
 export const REHYDRATE = 'REHYDRATE'
 
 export default {
-    BATCH: `${PREFIX}${SEPERATOR}${BATCH}`,
-    RESET: `${PREFIX}${SEPERATOR}${RESET}`,
+    BATCH: `${DELIMITER}${PREFIX}${SEPERATOR}${BATCH}`,
+    RESET: `${DELIMITER}${PREFIX}${SEPERATOR}${RESET}`,
 }

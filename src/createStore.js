@@ -1,16 +1,16 @@
-import { createStore as defaultCreateReduxStore } from 'redux'
-import { bindActionCreators as defaultBindActionCreators } from 'redux'
+import { applyMiddleware, compose, bindActionCreators as defaultBindActionCreators } from 'redux'
 import { createSelector as defaultCreateSelector } from 'reselect'
+import invariant from 'invariant'
 
+import defaultCreateAnewSelector from './createAnewSelector'
 import defaultCreateBatch from './createBatch'
+import defaultCreateBatchMiddleware from './createBatchMiddleware'
 import defaultCreateReducer from './createReducer'
 import defaultCreateReduxAnewProps from './createReduxAnewProps'
+import defaultCreateReduxStore from './createReduxStore'
 import defaultCreateSetState from './createSetState'
-import defaultCreateAnewSelector from './createAnewSelector'
-import defaultCreatePersistStore from './createPersistStore'
-
-import invariant from 'invariant'
 import invariantFunctionProperty from './invariantFunctionProperty'
+import invariantPersistState from './invariantPersistState'
 import reservedReducerNames from './reservedReducerNames'
 
 export default function createStore(
@@ -24,21 +24,21 @@ export default function createStore(
         persist,
         reducer,
         enhancer,
-    },
+    } = {},
     {
+        createReduxStore = defaultCreateReduxStore,
         createBatch = defaultCreateBatch,
+        createBatchMiddleware = defaultCreateBatchMiddleware,
         createReducer = defaultCreateReducer,
         createReduxAnewProps = defaultCreateReduxAnewProps,
         createSetState = defaultCreateSetState,
         createAnewSelector = defaultCreateAnewSelector,
-        createPersistStore = defaultCreatePersistStore,
         createSelector = defaultCreateSelector,
-        createReduxStore = defaultCreateReduxStore,
         bindActionCreators = defaultBindActionCreators,
     } = {}
 ) {
+    invariantPersistState(name, state, persist)
     invariantFunctionProperty(name, 'store creation')
-
     invariant(
         typeof reducer !== 'object',
         `Wrong type "reducer" was passed as an object instead of a function ` +
@@ -58,6 +58,7 @@ export default function createStore(
         selectors,
         effects: { ...effects },
         batches: [],
+        type: 'single',
     }
 
     /**
@@ -78,17 +79,29 @@ export default function createStore(
     const anewReducer = createReducer(anewStore, reducer, persist)
 
     /**
-     * Redux Store
-     * @type { Object }
-     */
-    const store = createReduxStore(anewReducer, anewStore.state, enhancer)
-    const reduxStore = createPersistStore(persist, store)
-
-    /**
      * Create anew specific store props
      * @type { Object }
      */
-    reduxStore.anew = createReduxAnewProps(anewStore, anewReducer)
+    const anewProps = createReduxAnewProps(anewStore, anewReducer)
+
+    /**
+     * Create Batch Middleware with reference to batches
+     */
+    const enhancerWithMiddlewares = compose(
+        ...(enhancer ? [enhancer] : []),
+        applyMiddleware(createBatchMiddleware(anewProps.getBatches))
+    )
+
+    /**
+     * Redux Store
+     * @type { Object }
+     */
+    const reduxStore = createReduxStore(
+        anewReducer,
+        anewStore.state,
+        enhancerWithMiddlewares,
+        persist
+    )
 
     /**
      * Extend Dispatcher to include reducers, effects, and batch.
@@ -120,6 +133,8 @@ export default function createStore(
     reduxStore.dispatch.actions = {}
     reduxStore.dispatch.batch = createBatch(reduxStore)
 
+    reduxStore.anew = anewProps
+
     /**
      * Transfer redux store dispatch methods.
      * Avoid referencing for dispatch and batch as their references
@@ -132,7 +147,7 @@ export default function createStore(
     /**
      * Trasfer redux store getState methods
      */
-    anewStore.select = {}
+    anewStore.select = () => reduxStore.getState()
 
     /**
      * Populate getState selectors
@@ -143,24 +158,24 @@ export default function createStore(
     }
 
     Object.entries(selectors).forEach(([selectorName, selectorCreator]) => {
-        invariantFunctionProperty(selectorName, name)
+        if (invariantFunctionProperty(selectorName, name)) {
+            function selectorWithParams(...payload) {
+                if (!selectorParams.core && reduxStore.anew.core) {
+                    selectorParams.core = reduxStore.anew.core.getState
+                }
 
-        function selectorWithParams(...payload) {
-            if (!selectorParams.core && reduxStore.anew.core) {
-                selectorParams.core = reduxStore.anew.core.getState
+                const selector = selectorCreator(selectorParams)
+                const { ref, value } = selector(...payload)
+
+                reduxStore.getState[selectorName] = ref
+                anewStore.select[selectorName] = ref
+
+                return value
             }
 
-            const selector = selectorCreator(selectorParams)
-            const { ref, value } = selector(...payload)
-
-            reduxStore.getState[selectorName] = ref
-            anewStore.select[selectorName] = ref
-
-            return value
+            reduxStore.getState[selectorName] = selectorWithParams
+            anewStore.select[selectorName] = selectorWithParams
         }
-
-        reduxStore.getState[selectorName] = selectorWithParams
-        anewStore.select[selectorName] = selectorWithParams
     })
 
     /**
@@ -242,11 +257,8 @@ export default function createStore(
             if (!effectParams.core && reduxStore.anew.core) {
                 const {
                     getState,
-                    firestore,
                     dispatch: { reducers, effects, actions, batch },
                 } = reduxStore.anew.core
-
-                effectParams.firestore = firestore
 
                 effectParams.core = {
                     select: getState,

@@ -1,16 +1,13 @@
-import { createStore as defaultCreateReduxStore } from 'redux'
-import { applyMiddleware as defaultApplyMiddleware } from 'redux'
+import { compose, applyMiddleware } from 'redux'
+
+import ActionTypes from './actionTypes'
 import defaultCombineReducers from './combineReducers'
 import defaultCreateBatch from './createBatch'
 import defaultCreateBatchMiddleware from './createBatchMiddleware'
-import defaultCreateCombinedReducer from './createCombinedReducer'
 import defaultCreateReduxAnewProps from './createReduxAnewProps'
+import defaultCreateReduxStore from './createReduxStore'
 import defaultCreateSetState from './createSetState'
-import defaultCreatePersistStore from './createPersistStore'
-
-import invariant from 'invariant'
 import invariantFunctionProperty from './invariantFunctionProperty'
-import ActionTypes from './actionTypes'
 
 export default function combineStores(
     { name = 'combinedStore', stores = [], persist, enhancer },
@@ -18,12 +15,9 @@ export default function combineStores(
         combineReducers = defaultCombineReducers,
         createBatch = defaultCreateBatch,
         createBatchMiddleware = defaultCreateBatchMiddleware,
-        createCombinedReducer = defaultCreateCombinedReducer,
         createReduxAnewProps = defaultCreateReduxAnewProps,
         createSetState = defaultCreateSetState,
-        createPersistStore = defaultCreatePersistStore,
         createReduxStore = defaultCreateReduxStore,
-        applyMiddleware = defaultApplyMiddleware,
     } = {}
 ) {
     invariantFunctionProperty(name, 'store combination')
@@ -36,6 +30,7 @@ export default function combineStores(
         state: {},
         reducers: {},
         batches: [],
+        type: 'combined',
     }
 
     /**
@@ -44,44 +39,34 @@ export default function combineStores(
     anewStore.setState = createSetState(anewStore)
 
     /**
-     * Combine Redux Store
-     */
-    let reduxReducer = combineReducers(anewStore, stores, persist)
-
-    /**
      * Generate Combined Anew Store
      */
-    const anewReducer = createCombinedReducer(anewStore, reduxReducer)
+    const anewReducer = combineReducers(anewStore, stores, persist)
 
     /**
-     * Create getBatches for early reference
+     * Create anew specific store props
+     * @type { Object }
      */
-    let getBatches = () => anewStore.batches
+    const anewProps = createReduxAnewProps(anewStore, anewReducer)
 
     /**
      * Create Batch Middleware with reference to batches
      */
-    const createWithMiddlewares = applyMiddleware(createBatchMiddleware(getBatches))(
-        createReduxStore
+    const enhancerWithMiddlewares = compose(
+        ...(enhancer ? [enhancer] : []),
+        applyMiddleware(createBatchMiddleware(anewProps.getBatches))
     )
 
     /**
      * Redux Store
      * @type { Object }
      */
-    const store = createWithMiddlewares(anewReducer, anewStore.state, enhancer)
-    const reduxStore = createPersistStore(persist, store)
-
-    /**
-     * Create anew specific store props
-     * @type { Object }
-     */
-    reduxStore.anew = createReduxAnewProps(anewStore, anewReducer)
-
-    /**
-     * Update getBatches Reference
-     */
-    getBatches = () => reduxStore.anew.getBatches()
+    const reduxStore = createReduxStore(
+        anewReducer,
+        anewStore.state,
+        enhancerWithMiddlewares,
+        persist
+    )
 
     /**
      * Extend Dispatcher to include reducers, effects, and batch
@@ -93,6 +78,8 @@ export default function combineStores(
     reduxStore.dispatch.effects = {}
     reduxStore.dispatch.actions = {}
     reduxStore.dispatch.batch = createBatch(reduxStore, 'combined')
+
+    reduxStore.anew = anewProps
 
     /**
      * Populate dispatch reducers and effects

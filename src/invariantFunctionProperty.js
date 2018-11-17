@@ -12,9 +12,13 @@ const functionProperties = [
 ]
 
 export default function invariantFunctionProperty(name, objectName) {
+    const isValid = functionProperties.indexOf(name) === -1
+
     invariant(
-        functionProperties.indexOf(name) === -1,
+        isValid,
         `"${name} is a reserved function property. Please choose a different name " ` +
             `for "${name}" in "${objectName}"`
     )
+
+    return isValid
 }
