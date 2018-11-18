@@ -601,6 +601,14 @@ export default createStore({
     name: 'router',
     actions: routerActions,
     reducer: connectRouter(history),
+    state: {
+        action: '',
+        location: {
+            hash: '',
+            pathname: '/',
+            search: '',
+        },
+    },
 
     // You may also use anew store properties
     selectors: {...},
