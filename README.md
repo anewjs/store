@@ -595,7 +595,14 @@ import { connectRouter, routerActions } from 'connected-react-router'
 import createStore from '@anew/store'
 import createBrowserHistory from 'history/createBrowserHistory'
 
-const history = createBrowserHistory()
+//
+// Remember to use the same history object
+// when you wrap your routes using:
+// Router.wrap(Component, { history })
+// or
+// Provider.wrap(Component, { Router, RouterConfig: { history } })
+//
+export const history = createBrowserHistory()
 
 export default createStore({
     name: 'router',
