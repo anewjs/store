@@ -5,7 +5,7 @@
     "main": "lib/index.js",
     "author": "Abdelrahman Salem <abubakir1997@gmail.com> (http://www.pages.drexel.edu/\\~aas372/)",
     "license": "MIT",
-    "homepage": "https://github.com/anew-org/store#readme",
+    "homepage": "https://github.com/anewjs/store#readme",
     "directories": {
         "lib": "lib"
     },
@@ -21,7 +21,7 @@
     },
     "repository": {
         "type": "git",
-        "url": "git+https://github.com/anew-org/store.git"
+        "url": "git+https://github.com/anewjs/store.git"
     },
     "keywords": [
         "anew",
@@ -38,7 +38,7 @@
         "elm"
     ],
     "bugs": {
-        "url": "https://github.com/anew-org/store/issues"
+        "url": "https://github.com/anewjs/store/issues"
     },
     "dependencies": {
         "invariant": "^2.2.4",
