@@ -184,3 +184,11 @@ describe('Experimental Store', () => {
         expect(store.get.list.items()).toEqual([3])
     })
 })
+
+// 1. Provider
+//      1. Subscribe
+//      2. Staging
+//      3. Connect
+// 2. OutsideNamespace inside reducers and actions
+// 3. Persistor
+// 4. Mutators?
