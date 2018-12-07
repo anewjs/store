@@ -1,4 +1,5 @@
 import Store from '../src/store'
+import { Stream } from 'stream';
 
 const storeConfig = () => ({
     actions: {
@@ -64,14 +65,6 @@ const storeConfig = () => ({
                         items: [...state.items, add],
                     }
                 },
-
-                on: {
-                    counter: {
-                        inc(state, counter, ...args) {
-                            console.log(counter)
-                        }
-                    },
-                },
             },
 
             getters: {
@@ -128,16 +121,6 @@ const storeConfig = () => ({
             },
         ]
     },
-
-    on: {
-        commit(type, args) {
-            console.log('committed', type, args)
-        },
-
-        dispatch(type, args) {
-            console.log('dispatched', type, args)
-        },
-    },
 })
 
 describe('Experimental Store', () => {
@@ -166,13 +149,21 @@ describe('Experimental Store', () => {
         expect(store.get.list.todo.items()).toEqual([])
     })
 
-    it('select & commit', () => {
+    it('select & commit & subscribe', () => {
         const store = new Store(storeConfig())
+        const mockSubscribe = jest.fn()
+
+        store.subscribe(mockSubscribe)
+
+        store.stage()
         store.commit.counter.inc()
         store.commit.counter.inc()
+        store.stage.commit()
+
         store.commit.list.add()
         store.commit.list.todo.add()
 
+        expect(mockSubscribe).toHaveBeenCalledTimes(3)
         expect(store.select.counter.count()).toBe(3)
         expect(store.select.list.count()).toBe(1)
         expect(store.select.list.todo.count()).toBe(1)
@@ -193,7 +184,5 @@ describe('Experimental Store', () => {
 })
 
 // 1. Provider
-//      1. Subscribe
-//      2. Staging
-//      3. Connect
-// 3. Persistor
+// 2. Connect
+// 3. Persistor?

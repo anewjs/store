@@ -30,30 +30,34 @@ export default class Store {
         this.on = on
         this.modules = modules
 
+        // Initialize Listeners
+        this._listeners = []
+        this._nextListeners = this._listeners
+
         // Initialize Store
-        this.initStore()
+        this._initStore()
 
         // Install Options (From, To, ..args)
-        this.installModules(modules, this)
-        this.installGetters(getters, this.get, this.get)
-        this.installSelectors(selectors, this.select, this)
-        this.installReducers(reducers, this.commit, {}, this.state, {}, this.get)
-        this.installActions(actions, this.dispatch, this)
+        this._installModules(modules, this)
+        this._installGetters(getters, this.get, this.get)
+        this._installSelectors(selectors, this.select, this)
+        this._installReducers(reducers, this.commit, {}, this.state, {}, this.get)
+        this._installActions(actions, this.dispatch, this)
     }
 
-    initStore() {
+    _initStore() {
         this.select = {}
-        this.stage.commit = this.stageCommit
+        this.stage.commit = this._stageCommit
     }
 
-    installModules(modules = {}, storage) {
+    _installModules(modules = {}, storage) {
         Object.entries(modules).forEach(([moduleName, module]) => {
             if (module.state === undefined) module.state = {}
 
             Object.keys(module).forEach(type => {
                 switch (type) {
                     case 'modules':
-                        this.installModules(module.modules, module)
+                        this._installModules(module.modules, module)
                         break
                     default:
                         storage[type][moduleName] = module[type]
@@ -63,7 +67,7 @@ export default class Store {
         })
     }
 
-    installGetters(getters, storage, getState) {
+    _installGetters(getters, storage, getState) {
         Object.entries(getters).forEach(([getName, get]) => {
             switch (typeof get) {
                 case 'function':
@@ -71,13 +75,13 @@ export default class Store {
                     break
                 case 'object':
                     storage[getName] = () => getState()[getName]
-                    this.installGetters(get, storage[getName], storage[getName])
+                    this._installGetters(get, storage[getName], storage[getName])
                     break
             }
         })
     }
 
-    installSelectors(selectors, storage, store) {
+    _installSelectors(selectors, storage, store) {
         Object.entries(selectors).forEach(([selectorName, selector]) => {
             switch (typeof selector) {
                 case 'function':
@@ -87,7 +91,7 @@ export default class Store {
                 case 'object':
                     storage[selectorName] = {}
 
-                    this.installSelectors(selector, storage[selectorName], {
+                    this._installSelectors(selector, storage[selectorName], {
                         get: store.get[selectorName],
                         select: store.select[selectorName],
                         core: this,
@@ -97,7 +101,7 @@ export default class Store {
         })
     }
 
-    installReducers(
+    _installReducers(
         reducers,
         storage,
         parentReducers,
@@ -119,34 +123,36 @@ export default class Store {
 
                         storage[reducerName] = (...args) => {
                             this.on.commit(path, args)
-                            this.updateState(parentState, reducer(getState(), ...args), stateKey)
-                            this.callPathInSiblingReducers(
+                            this._updateState(parentState, reducer(getState(), ...args), stateKey)
+                            this._callPathInSiblingReducers(
                                 parentReducers,
                                 path,
                                 parentState[stateKey],
                                 parentState,
                                 ...args
                             )
+                            this._notifiyListeners()
                             return parentState[stateKey]
                         }
                     } else {
                         storage[reducerName] = (...args) => {
                             this.on.commit(path, args)
-                            this.updateState(state, reducer(getState(), ...args))
-                            this.callPathInSiblingReducers(
+                            this._updateState(state, reducer(getState(), ...args))
+                            this._callPathInSiblingReducers(
                                 parentReducers,
                                 path,
                                 state,
                                 parentState,
                                 ...args
                             )
+                            this._notifiyListeners()
                             return state
                         }
                     }
                     break
                 case 'object':
                     storage[reducerName] = {}
-                    this.installReducers(
+                    this._installReducers(
                         reducer,
                         storage[reducerName],
                         reducers,
@@ -161,7 +167,7 @@ export default class Store {
         })
     }
 
-    installActions(actions, storage, store, prefix = '') {
+    _installActions(actions, storage, store, prefix = '') {
         Object.entries(actions).forEach(([actionName, action]) => {
             switch (typeof action) {
                 case 'function':
@@ -175,7 +181,7 @@ export default class Store {
                     break
                 case 'object':
                     storage[actionName] = {}
-                    this.installActions(
+                    this._installActions(
                         action,
                         storage[actionName],
                         {
@@ -200,6 +206,29 @@ export default class Store {
     | Exposed API
     |
     */
+
+    subscribe = listener => {
+        if(typeof listener !== 'function') {
+            throw new Error('Expected the listener to be a function.')
+        }
+
+        let isSubscribed = true
+
+        this._ensureCanMutateNextListeners()
+        this._nextListeners.push(listener)
+
+        return function unsubscribe() {
+            if (!isSubscribed) {
+                return
+            }
+
+            isSubscribed = false
+
+            this._ensureCanMutateNextListeners()
+            const index = this._nextListeners.indexOf(listener)
+            this._nextListeners.splice(index, 1)
+        }
+    }
 
     get = () => {
         return this.state
@@ -240,19 +269,34 @@ export default class Store {
         this.on.commit('@anew/STAGE_START')
     }
 
-    stageCommit = () => {
+    /**
+     | ------------------
+     | Internal API
+     | ------------------
+     |
+     */
+
+    _stageCommit = () => {
         this.isStaging = false
         this.on.commit('@anew/STAGE_COMPLETE')
+        this._notifiyListeners()
     }
 
-    /**
-    | ------------------
-    | Internal API
-    | ------------------
-    |
-    */
+    _ensureCanMutateNextListeners = () => {
+        if (this._nextListeners === this._listeners) {
+            this._nextListeners = this._listeners.slice()
+        }
+    }
 
-    callPathInSiblingReducers = (reducers, path, state, parentState, ...args) => {
+    _notifiyListeners = () => {
+        if (!this.isStaging) {
+            const listeners = (this._listeners = this._nextListeners)
+
+            listeners.forEach(listener => listener())
+        }
+    }
+
+    _callPathInSiblingReducers = (reducers, path, state, parentState, ...args) => {
         const paths = path.split('/')
 
         if (paths.length === 2) {
@@ -265,7 +309,7 @@ export default class Store {
                     const targetReducer = targetStore && targetStore[targetReducerName]
 
                     if (typeof targetReducer === 'function') {
-                        this.updateState(
+                        this._updateState(
                             parentState[reducerName],
                             targetReducer(parentState[reducerName], state, ...args)
                         )
@@ -275,7 +319,7 @@ export default class Store {
         }
     }
 
-    updateState = (state, change, stateKey) => {
+    _updateState = (state, change, stateKey) => {
         if (change && change !== state) {
             if (stateKey) {
                 this.on.update(state[stateKey])
