@@ -64,6 +64,14 @@ const storeConfig = () => ({
                         items: [...state.items, add],
                     }
                 },
+
+                on: {
+                    counter: {
+                        inc(state, counter, ...args) {
+                            console.log(counter)
+                        }
+                    },
+                },
             },
 
             getters: {
@@ -160,7 +168,6 @@ describe('Experimental Store', () => {
 
     it('select & commit', () => {
         const store = new Store(storeConfig())
-
         store.commit.counter.inc()
         store.commit.counter.inc()
         store.commit.list.add()
@@ -189,6 +196,4 @@ describe('Experimental Store', () => {
 //      1. Subscribe
 //      2. Staging
 //      3. Connect
-// 2. OutsideNamespace inside reducers and actions
 // 3. Persistor
-// 4. Mutators?

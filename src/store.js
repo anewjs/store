@@ -2,10 +2,20 @@ import { createSelector } from 'reselect'
 
 export default class Store {
     constructor(options) {
-        this.use(options)
+        if (options) {
+            this.use(options)
+        }
     }
 
-    use({ state = {}, reducers = {}, actions = {}, getters = {}, selectors = {}, on = {}, modules } = {}) {
+    use({
+        state = this.state || {},
+        reducers = this.reducers || {},
+        actions = this.actions || {},
+        getters = this.getters || {},
+        selectors = this.selectors || {},
+        on = this.on || {},
+        modules = this.modules,
+    } = {}) {
         // Nested Default
         if (!on.dispatch) on.dispatch = () => null
         if (!on.commit) on.commit = () => null
@@ -18,6 +28,7 @@ export default class Store {
         this.getters = getters
         this.selectors = selectors
         this.on = on
+        this.modules = modules
 
         // Initialize Store
         this.initStore()
@@ -26,7 +37,7 @@ export default class Store {
         this.installModules(modules, this)
         this.installGetters(getters, this.get, this.get)
         this.installSelectors(selectors, this.select, this)
-        this.installReducers(reducers, this.commit, this.state, this.get)
+        this.installReducers(reducers, this.commit, {}, this.state, {}, this.get)
         this.installActions(actions, this.dispatch, this)
     }
 
@@ -82,33 +93,69 @@ export default class Store {
                         core: this,
                     })
                     break
-
             }
         })
     }
 
-    installReducers(reducers, storage, state, getState, prefix = '', isLevelUp) {
+    installReducers(
+        reducers,
+        storage,
+        parentReducers,
+        state,
+        parentState,
+        getState,
+        prefix = '',
+        isLevelUp
+    ) {
         Object.entries(reducers).forEach(([reducerName, reducer]) => {
+            if (reducerName === 'on') return
+
             switch (typeof reducer) {
                 case 'function':
+                    const path = prefix + reducerName
+
                     if (isLevelUp) {
                         const stateKey = prefix.replace(/\/$/, '')
 
                         storage[reducerName] = (...args) => {
-                            this.commit('+' + prefix + reducerName, ...args)
-                            return (state[stateKey] = this.updateState(state[stateKey], reducer(getState(), ...args)))
+                            this.on.commit(path, args)
+                            this.updateState(parentState, reducer(getState(), ...args), stateKey)
+                            this.callPathInSiblingReducers(
+                                parentReducers,
+                                path,
+                                parentState[stateKey],
+                                parentState,
+                                ...args
+                            )
+                            return parentState[stateKey]
                         }
                     } else {
                         storage[reducerName] = (...args) => {
-                            this.commit('+' + prefix + reducerName, ...args)
-                            return this.updateState(state, reducer(getState(), ...args))
+                            this.on.commit(path, args)
+                            this.updateState(state, reducer(getState(), ...args))
+                            this.callPathInSiblingReducers(
+                                parentReducers,
+                                path,
+                                state,
+                                parentState,
+                                ...args
+                            )
+                            return state
                         }
                     }
                     break
                 case 'object':
                     storage[reducerName] = {}
-                    const isObject = typeof state[reducerName] === 'object'
-                    this.installReducers(reducer, storage[reducerName], isObject ? state[reducerName] : state, () => getState()[reducerName], prefix + reducerName + '/', !isObject)
+                    this.installReducers(
+                        reducer,
+                        storage[reducerName],
+                        reducers,
+                        state[reducerName],
+                        state,
+                        () => getState()[reducerName],
+                        prefix + reducerName + '/',
+                        typeof state[reducerName] !== 'object'
+                    )
                     break
             }
         })
@@ -118,21 +165,29 @@ export default class Store {
         Object.entries(actions).forEach(([actionName, action]) => {
             switch (typeof action) {
                 case 'function':
+                    const path = prefix + actionName
+
                     storage[actionName] = (...args) => {
-                        this.dispatch('+' + prefix + actionName, ...args)
+                        this.on.dispatch(path, args)
+
                         return action(store, ...args)
                     }
                     break
                 case 'object':
                     storage[actionName] = {}
-                    this.installActions(action, storage[actionName], {
-                        select: store.select[actionName],
-                        get: store.get[actionName],
-                        dispatch: store.dispatch[actionName],
-                        commit: store.commit[actionName],
-                        stage: this.stage,
-                        core: this,
-                    }, prefix + actionName + '/')
+                    this.installActions(
+                        action,
+                        storage[actionName],
+                        {
+                            select: store.select[actionName],
+                            get: store.get[actionName],
+                            dispatch: store.dispatch[actionName],
+                            commit: store.commit[actionName],
+                            stage: this.stage,
+                            core: this,
+                        },
+                        prefix + actionName + '/'
+                    )
                     break
             }
         })
@@ -150,61 +205,34 @@ export default class Store {
         return this.state
     }
 
-    dispatch = (action, ...args) => {
-        this.on.dispatch(action, args)
+    dispatch = (actionPath, ...args) => {
+        const actionPaths = actionPath.split('/')
+        const lastActionIndex = actionPaths.length - 1
 
-        if(action[0] === '+') return
+        return actionPaths.reduce((actionParent, path, i) => {
+            if (i === lastActionIndex) {
+                const action = actionParent[path]
 
-        const paths = action.split('/')
-        const lastPathIndex = paths.length - 1
-
-        return paths.reduce((actionObj, path, i) => {
-            if (i === lastPathIndex) {
-                return actionObj[0][path](actionObj[1], ...args)
+                return typeof action === 'function' && action(...args)
             }
 
-            return [
-                actionObj[0][path],
-                {
-                    select: actionObj[1].select[path],
-                    get: actionObj[1].get[path],
-                    dispatch: actionObj[1].dispatch[path],
-                    commit: actionObj[1].commit[path],
-                    stage: this.stage,
-                    core: this,
-                }
-            ]
-        }, [this.actions, this])
+            return actionParent[path]
+        }, this.dispatch)
     }
 
-    commit = (reducer, ...args) => {
-        this.on.commit(reducer, args)
+    commit = (reducerPath, ...args) => {
+        const reducerPaths = reducerPath.split('/')
+        const lastReducerIndex = reducerPaths.length - 1
 
-        if (reducer[0] === '+') return
+        return reducerPaths.reduce((reducerParent, path, i) => {
+            if (i === lastReducerIndex) {
+                const reducer = reducerParent[path]
 
-        const paths = reducer.split('/')
-        const lastPathIndex = paths.length - 1
-
-        let nextState = this.state
-        let levelUp
-
-        return paths.reduce((reducerObj, path, i) => {
-            if (i === lastPathIndex) {
-                if (levelUp) {
-                    return (nextState[levelUp] = this.updateState(nextState[levelUp], reducerObj[path](nextState[levelUp], ...args)))
-                } else {
-                    return this.updateState(nextState, reducerObj[path](nextState, ...args))
-                }
+                return typeof reducer === 'function' && reducer(...args)
             }
 
-            if (i === lastPathIndex - 1 && typeof nextState[path] !== 'object') {
-                levelUp = path
-            } else {
-                nextState = nextState[path]
-            }
-
-            return reducerObj[path]
-        }, this.reducers)
+            return reducerParent[path]
+        }, this.commit)
     }
 
     stage = () => {
@@ -224,14 +252,47 @@ export default class Store {
     |
     */
 
-    updateState = (state, change) => {
-        if (change && change !== state) {
-            this.on.update(state)
+    callPathInSiblingReducers = (reducers, path, state, parentState, ...args) => {
+        const paths = path.split('/')
 
-            if (typeof state === 'object') {
-                state = Object.assign(state, change)
+        if (paths.length === 2) {
+            const targetStoreName = paths[0]
+            const targetReducerName = paths[1]
+
+            Object.entries(reducers).forEach(([reducerName, reducer]) => {
+                if (reducer.on) {
+                    const targetStore = reducer.on[targetStoreName]
+                    const targetReducer = targetStore && targetStore[targetReducerName]
+
+                    if (typeof targetReducer === 'function') {
+                        this.updateState(
+                            parentState[reducerName],
+                            targetReducer(parentState[reducerName], state, ...args)
+                        )
+                    }
+                }
+            })
+        }
+    }
+
+    updateState = (state, change, stateKey) => {
+        if (change && change !== state) {
+            if (stateKey) {
+                this.on.update(state[stateKey])
+
+                if (typeof state[stateKey] === 'object') {
+                    return (state[stateKey] = Object.assign(state[stateKey], change))
+                } else {
+                    return (state[stateKey] = change)
+                }
             } else {
-                state = change
+                this.on.update(state)
+
+                if (typeof state === 'object') {
+                    return (state = Object.assign(state, change))
+                } else {
+                    return (state = change)
+                }
             }
         }
 
