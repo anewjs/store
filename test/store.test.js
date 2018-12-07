@@ -1,5 +1,4 @@
 import Store from '../src/store'
-import { Stream } from 'stream';
 
 const storeConfig = () => ({
     actions: {
@@ -47,10 +46,7 @@ const storeConfig = () => ({
             },
 
             selectors: {
-                count: store => [
-                    store.get.count,
-                    count => count
-                ]
+                count: store => [store.get.count, count => count],
             },
         },
 
@@ -74,10 +70,7 @@ const storeConfig = () => ({
             },
 
             selectors: {
-                count: store => [
-                    store.get.items,
-                    items => items.length
-                ]
+                count: store => [store.get.items, items => items.length],
             },
 
             modules: {
@@ -101,10 +94,7 @@ const storeConfig = () => ({
                     },
 
                     selectors: {
-                        count: store => [
-                            store.get.items,
-                            items => items.length
-                        ]
+                        count: store => [store.get.items, items => items.length],
                     },
                 },
             },
@@ -119,7 +109,7 @@ const storeConfig = () => ({
             (listItems, todoItems) => {
                 return listItems.length + todoItems.length
             },
-        ]
+        ],
     },
 })
 
@@ -134,7 +124,7 @@ describe('Experimental Store', () => {
                 todo: {
                     items: [],
                 },
-            }
+            },
         })
 
         expect(store.get.counter()).toBe(1)

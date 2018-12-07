@@ -208,7 +208,7 @@ export default class Store {
     */
 
     subscribe = listener => {
-        if(typeof listener !== 'function') {
+        if (typeof listener !== 'function') {
             throw new Error('Expected the listener to be a function.')
         }
 
