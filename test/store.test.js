@@ -153,7 +153,7 @@ describe('Experimental Store', () => {
         const store = new Store(storeConfig())
         const mockSubscribe = jest.fn()
 
-        store.subscribe(mockSubscribe)
+        const unsubscribe = store.subscribe(mockSubscribe)
 
         store.stage()
         store.commit.counter.inc()
@@ -161,9 +161,12 @@ describe('Experimental Store', () => {
         store.stage.commit()
 
         store.commit.list.add()
+
+        unsubscribe()
+
         store.commit.list.todo.add()
 
-        expect(mockSubscribe).toHaveBeenCalledTimes(3)
+        expect(mockSubscribe).toHaveBeenCalledTimes(2)
         expect(store.select.counter.count()).toBe(3)
         expect(store.select.list.count()).toBe(1)
         expect(store.select.list.todo.count()).toBe(1)

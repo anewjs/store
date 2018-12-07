@@ -217,7 +217,7 @@ export default class Store {
         this._ensureCanMutateNextListeners()
         this._nextListeners.push(listener)
 
-        return function unsubscribe() {
+        const unsubscribe = () => {
             if (!isSubscribed) {
                 return
             }
@@ -228,6 +228,8 @@ export default class Store {
             const index = this._nextListeners.indexOf(listener)
             this._nextListeners.splice(index, 1)
         }
+
+        return unsubscribe
     }
 
     get = () => {
