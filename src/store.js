@@ -70,8 +70,9 @@ export default class Store {
     _installModules(modules = {}, storage) {
         Object.entries(modules).forEach(([moduleName, module]) => {
             if (module.state === undefined) module.state = {}
+            if (!module.getters) module.getters = {}
             if (process.env.NODE_ENV !== 'production') {
-                if (Object.keys(module.mutations).length) {
+                if (module.mutations && Object.keys(module.mutations).length) {
                     const stateType = typeof module.state
 
                     assert(
