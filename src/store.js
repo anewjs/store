@@ -23,7 +23,7 @@ export default class Store {
         modules = this.modules,
     } = {}) {
         if (process.env.NODE_ENV !== 'production') {
-            if (mutations) {
+            if (Object.keys(mutations).length) {
                 const stateType = typeof state
 
                 assert(
@@ -70,7 +70,7 @@ export default class Store {
         Object.entries(modules).forEach(([moduleName, module]) => {
             if (module.state === undefined) module.state = {}
             if (process.env.NODE_ENV !== 'production') {
-                if (module.mutations) {
+                if (Object.keys(module.mutations).length) {
                     const stateType = typeof module.state
 
                     assert(
