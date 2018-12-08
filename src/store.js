@@ -192,7 +192,7 @@ export default class Store {
         const listenerKeys = Object.keys(listeners)
 
         for (let i = 0, listenersLen = listenerKeys.length; i < listenersLen; i++) {
-            const contextName = listenerKeys[i] // list -> counter/todo
+            const contextName = listenerKeys[i]
             const context = listeners[contextName]
 
             const contextKeys = Object.keys(context)
@@ -206,7 +206,7 @@ export default class Store {
             }
 
             for (let j = 0, contextLen = contextKeys.length; j < contextLen; j++) {
-                const targetName = contextKeys[j] // counter/todo -> inc/another
+                const targetName = contextKeys[j]
                 const target = context[targetName]
 
                 if (typeof target !== 'object') continue
@@ -215,7 +215,7 @@ export default class Store {
                 const targetState = state[targetName]
 
                 for (let k = 0, targetLen = targetKeys.length; k < targetLen; k++) {
-                    const reducerName = targetKeys[k] // inc/another -> toggle
+                    const reducerName = targetKeys[k]
                     const reducer = target[reducerName]
 
                     switch (typeof reducer) {
