@@ -171,7 +171,7 @@ export default class Store {
                         // if root state is primitive value
                         storage[reducerName] = (...args) => {
                             const change = reducer(this.state, ...args)
-                            this._stateHasChanged = change && change !== this.state
+                            this._stateHasChanged = change !== this.state
 
                             if (this._stateHasChanged) {
                                 this.state = change
@@ -185,7 +185,7 @@ export default class Store {
                         // if target state is primitive value
                         storage[reducerName] = (...args) => {
                             const change = reducer(getState(), ...args)
-                            this._stateHasChanged = change && change !== parentState[stateKey]
+                            this._stateHasChanged = change !== parentState[stateKey]
 
                             if (this._stateHasChanged) {
                                 parentState[stateKey] = change
