@@ -166,7 +166,15 @@ export default class Store {
 
             switch (typeof reducer) {
                 case 'function':
-                    if (stateKey) {
+                    if (typeof state !== 'object' && !stateKey) {
+                        // if root state is primitive value
+                        storage[reducerName] = (...args) => {
+                            this.state = reducer(this.state, ...args)
+                            this._notifiyListeners(path, ...args)
+                            this._notifiySubscriptions()
+                            return this.state
+                        }
+                    } else if (stateKey) {
                         // if target state is primitive value
                         storage[reducerName] = (...args) => {
                             parentState[stateKey] = reducer(getState(), ...args)
