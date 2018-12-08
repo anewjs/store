@@ -47,6 +47,7 @@ export default class Store {
         this._subscriptions = []
         this._nextSubscriptions = this._subscriptions
         this._listeners = {}
+        this._stateHasChanged = false
 
         // Initialize Store
         this._initStore()
@@ -169,7 +170,13 @@ export default class Store {
                     if (typeof state !== 'object' && !stateKey) {
                         // if root state is primitive value
                         storage[reducerName] = (...args) => {
-                            this.state = reducer(this.state, ...args)
+                            const change = reducer(this.state, ...args)
+                            this._stateHasChanged = change && change !== this.state
+
+                            if (this._stateHasChanged) {
+                                this.state = change
+                            }
+
                             this._notifiyListeners(path, ...args)
                             this._notifiySubscriptions()
                             return this.state
@@ -177,7 +184,13 @@ export default class Store {
                     } else if (stateKey) {
                         // if target state is primitive value
                         storage[reducerName] = (...args) => {
-                            parentState[stateKey] = reducer(getState(), ...args)
+                            const change = reducer(getState(), ...args)
+                            this._stateHasChanged = change && change !== parentState[stateKey]
+
+                            if (this._stateHasChanged) {
+                                parentState[stateKey] = change
+                            }
+
                             this._notifiyListeners(path, ...args)
                             this._notifiySubscriptions()
                             return parentState[stateKey]
@@ -185,7 +198,13 @@ export default class Store {
                     } else {
                         // if target state is object
                         storage[reducerName] = (...args) => {
-                            state = Object.assign(state, reducer(getState(), ...args))
+                            const change = reducer(getState(), ...args)
+                            this._stateHasChanged = change && change !== state
+
+                            if (this._stateHasChanged) {
+                                state = Object.assign(state, change)
+                            }
+
                             this._notifiyListeners(path, ...args)
                             this._notifiySubscriptions()
                             return state
@@ -379,8 +398,10 @@ export default class Store {
      */
 
     _stageCommit = () => {
-        this.isStaging = false
-        this._notifiySubscriptions()
+        if (this.isStaging) {
+            this.isStaging = false
+            this._notifiySubscriptions()
+        }
     }
 
     _ensureCanMutateNextListeners = () => {
@@ -390,7 +411,8 @@ export default class Store {
     }
 
     _notifiySubscriptions = () => {
-        if (!this.isStaging) {
+        if (!this.isStaging && this._stateHasChanged) {
+            this._stateHasChanged = false
             const listeners = (this._subscriptions = this._nextSubscriptions)
 
             listeners.forEach(listener => listener())
