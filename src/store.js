@@ -13,36 +13,33 @@ export default class Store {
         actions = this.actions || {},
         getters = this.getters || {},
         selectors = this.selectors || {},
-        on = this.on || {},
+        listeners = this.listeners || {},
         modules = this.modules,
     } = {}) {
-        // Nested Default
-        if (!on.dispatch) on.dispatch = () => null
-        if (!on.commit) on.commit = () => null
-        if (!on.update) on.update = () => null
-
         // Assign Options
         this.state = state
         this.reducers = reducers
         this.actions = actions
         this.getters = getters
         this.selectors = selectors
-        this.on = on
+        this.listeners = listeners
         this.modules = modules
 
         // Initialize Listeners
-        this._listeners = []
-        this._nextListeners = this._listeners
+        this._subscriptions = []
+        this._nextSubscriptions = this._subscriptions
+        this._listeners = {}
 
         // Initialize Store
         this._initStore()
 
         // Install Options (From, To, ..args)
         this._installModules(modules, this)
-        this._installGetters(getters, this.get, this.get)
-        this._installSelectors(selectors, this.select, this)
-        this._installReducers(reducers, this.commit, {}, this.state, {}, this.get)
+        this._installGetters(getters, this.get)
+        this._installSelectors(selectors, this.select, { get: this.get, select: this.select })
+        this._installReducers(reducers, this.commit, this.state, {}, this.get)
         this._installActions(actions, this.dispatch, this)
+        this._installListeners(this.listeners, this._listeners, this.state, this)
     }
 
     _initStore() {
@@ -67,15 +64,15 @@ export default class Store {
         })
     }
 
-    _installGetters(getters, storage, getState) {
+    _installGetters(getters, storeGet) {
         Object.entries(getters).forEach(([getName, get]) => {
             switch (typeof get) {
                 case 'function':
-                    storage[getName] = (...args) => get(getState(), ...args)
+                    storeGet[getName] = (...args) => get(storeGet(), ...args)
                     break
                 case 'object':
-                    storage[getName] = () => getState()[getName]
-                    this._installGetters(get, storage[getName], storage[getName])
+                    storeGet[getName] = () => storeGet()[getName]
+                    this._installGetters(get, storeGet[getName])
                     break
             }
         })
@@ -101,66 +98,62 @@ export default class Store {
         })
     }
 
-    _installReducers(
-        reducers,
-        storage,
-        parentReducers,
-        state,
-        parentState,
-        getState,
-        prefix = '',
-        isLevelUp
-    ) {
+    _installReducers(reducers, storage, state, parentState, getState, prefix = '', stateKey) {
         Object.entries(reducers).forEach(([reducerName, reducer]) => {
-            if (reducerName === 'on') return
+            const path = prefix + reducerName
 
             switch (typeof reducer) {
                 case 'function':
-                    const path = prefix + reducerName
+                    let updateState
 
-                    if (isLevelUp) {
-                        const stateKey = prefix.replace(/\/$/, '')
+                    if (stateKey) {
+                        if (typeof parentState[stateKey] === 'object') {
+                            updateState = change => {
+                                parentState[stateKey] = Object.assign(parentState[stateKey], change)
+                            }
+                        } else {
+                            updateState = change => {
+                                parentState[stateKey] = change
+                            }
+                        }
 
                         storage[reducerName] = (...args) => {
-                            this.on.commit(path, args)
-                            this._updateState(parentState, reducer(getState(), ...args), stateKey)
-                            this._callPathInSiblingReducers(
-                                parentReducers,
-                                path,
-                                parentState[stateKey],
-                                parentState,
-                                ...args
-                            )
-                            this._notifiyListeners()
+                            updateState(reducer(getState(), ...args))
+                            this._notifiyListeners(path, ...args)
+                            this._notifiySubscriptions()
                             return parentState[stateKey]
                         }
                     } else {
+                        if (typeof state === 'object') {
+                            updateState = change => {
+                                state = Object.assign(state, change)
+                            }
+                        } else {
+                            updateState = change => {
+                                state = change
+                            }
+                        }
+
                         storage[reducerName] = (...args) => {
-                            this.on.commit(path, args)
-                            this._updateState(state, reducer(getState(), ...args))
-                            this._callPathInSiblingReducers(
-                                parentReducers,
-                                path,
-                                state,
-                                parentState,
-                                ...args
-                            )
-                            this._notifiyListeners()
+                            updateState(reducer(getState(), ...args))
+                            this._notifiyListeners(path, ...args)
+                            this._notifiySubscriptions()
                             return state
                         }
                     }
                     break
                 case 'object':
                     storage[reducerName] = {}
+                    const childState = state[reducerName]
+
                     this._installReducers(
                         reducer,
                         storage[reducerName],
-                        reducers,
-                        state[reducerName],
+                        childState,
                         state,
                         () => getState()[reducerName],
-                        prefix + reducerName + '/',
-                        typeof state[reducerName] !== 'object'
+                        path + '/',
+                        typeof childState !== 'object' && path
                     )
                     break
             }
@@ -169,15 +162,11 @@ export default class Store {
 
     _installActions(actions, storage, store, prefix = '') {
         Object.entries(actions).forEach(([actionName, action]) => {
+            const path = prefix + actionName
+
             switch (typeof action) {
                 case 'function':
-                    const path = prefix + actionName
-
-                    storage[actionName] = (...args) => {
-                        this.on.dispatch(path, args)
-
-                        return action(store, ...args)
-                    }
+                    storage[actionName] = (...args) => action(store, ...args)
                     break
                 case 'object':
                     storage[actionName] = {}
@@ -192,11 +181,73 @@ export default class Store {
                             stage: this.stage,
                             core: this,
                         },
-                        prefix + actionName + '/'
+                        path + '/'
                     )
                     break
             }
         })
+    }
+
+    _installListeners(listeners, storage, state, store, prefix = '') {
+        const listenerKeys = Object.keys(listeners)
+
+        for (let i = 0, listenersLen = listenerKeys.length; i < listenersLen; i++) {
+            const contextName = listenerKeys[i] // list -> counter/todo
+            const context = listeners[contextName]
+
+            const contextKeys = Object.keys(context)
+            const contextStore = {
+                select: store.select[contextName] || {},
+                get: store.get[contextName] || {},
+                dispatch: store.dispatch[contextName] || {},
+                commit: store.commit[contextName] || {},
+                stage: this.stage,
+                core: this,
+            }
+
+            for (let j = 0, contextLen = contextKeys.length; j < contextLen; j++) {
+                const targetName = contextKeys[j] // counter/todo -> inc/another
+                const target = context[targetName]
+
+                if (typeof target !== 'object') continue
+
+                const targetKeys = Object.keys(target)
+                const targetState = state[targetName]
+
+                for (let k = 0, targetLen = targetKeys.length; k < targetLen; k++) {
+                    const reducerName = targetKeys[k] // inc/another -> toggle
+                    const reducer = target[reducerName]
+
+                    switch (typeof reducer) {
+                        case 'function':
+                            const prevListener = context[`${prefix}${targetName}/${reducerName}`]
+                            const prevListenerBinded = prevListener && prevListener.bind({})
+
+                            if (prevListenerBinded) {
+                                storage[`${prefix}${targetName}/${reducerName}`] = (...args) => {
+                                    prevListenerBinded(...args)
+                                    return reducer(contextStore, targetState, ...args)
+                                }
+                            } else {
+                                storage[`${prefix}${targetName}/${reducerName}`] = (...args) => {
+                                    return reducer(contextStore, targetState, ...args)
+                                }
+                            }
+
+                            break
+                        case 'object':
+                            this._installListeners(
+                                context,
+                                storage,
+                                state[contextName],
+                                contextStore,
+                                contextName + '/'
+                            )
+                            break
+                    }
+                }
+            }
+        }
     }
 
     /**
@@ -215,7 +266,7 @@ export default class Store {
         let isSubscribed = true
 
         this._ensureCanMutateNextListeners()
-        this._nextListeners.push(listener)
+        this._nextSubscriptions.push(listener)
 
         const unsubscribe = () => {
             if (!isSubscribed) {
@@ -225,8 +276,8 @@ export default class Store {
             isSubscribed = false
 
             this._ensureCanMutateNextListeners()
-            const index = this._nextListeners.indexOf(listener)
-            this._nextListeners.splice(index, 1)
+            const index = this._nextSubscriptions.indexOf(listener)
+            this._nextSubscriptions.splice(index, 1)
         }
 
         return unsubscribe
@@ -268,7 +319,6 @@ export default class Store {
 
     stage = () => {
         this.isStaging = true
-        this.on.commit('@anew/STAGE_START')
     }
 
     /**
@@ -280,68 +330,28 @@ export default class Store {
 
     _stageCommit = () => {
         this.isStaging = false
-        this.on.commit('@anew/STAGE_COMPLETE')
-        this._notifiyListeners()
+        this._notifiySubscriptions()
     }
 
     _ensureCanMutateNextListeners = () => {
-        if (this._nextListeners === this._listeners) {
-            this._nextListeners = this._listeners.slice()
+        if (this._nextSubscriptions === this._subscriptions) {
+            this._nextSubscriptions = this._subscriptions.slice()
         }
     }
 
-    _notifiyListeners = () => {
+    _notifiySubscriptions = () => {
         if (!this.isStaging) {
-            const listeners = (this._listeners = this._nextListeners)
+            const listeners = (this._subscriptions = this._nextSubscriptions)
 
             listeners.forEach(listener => listener())
         }
     }
 
-    _callPathInSiblingReducers = (reducers, path, state, parentState, ...args) => {
-        const paths = path.split('/')
+    _notifiyListeners = (path, ...args) => {
+        const listener = this._listeners[path]
 
-        if (paths.length === 2) {
-            const targetStoreName = paths[0]
-            const targetReducerName = paths[1]
-
-            Object.entries(reducers).forEach(([reducerName, reducer]) => {
-                if (reducer.on) {
-                    const targetStore = reducer.on[targetStoreName]
-                    const targetReducer = targetStore && targetStore[targetReducerName]
-
-                    if (typeof targetReducer === 'function') {
-                        this._updateState(
-                            parentState[reducerName],
-                            targetReducer(parentState[reducerName], state, ...args)
-                        )
-                    }
-                }
-            })
+        if (listener) {
+            listener(...args)
         }
-    }
-
-    _updateState = (state, change, stateKey) => {
-        if (change && change !== state) {
-            if (stateKey) {
-                this.on.update(state[stateKey])
-
-                if (typeof state[stateKey] === 'object') {
-                    return (state[stateKey] = Object.assign(state[stateKey], change))
-                } else {
-                    return (state[stateKey] = change)
-                }
-            } else {
-                this.on.update(state)
-
-                if (typeof state === 'object') {
-                    return (state = Object.assign(state, change))
-                } else {
-                    return (state = change)
-                }
-            }
-        }
-
-        return state
     }
 }

@@ -1,11 +1,22 @@
 import Store from '../src/store'
 
-const storeConfig = () => ({
+const storeConfig = (mockCounterIncListener, mockTodoAddListener) => ({
     actions: {
         incAndAdd(store) {
             store.commit.counter.inc(2)
             store.commit.list.add(3)
         },
+    },
+
+    selectors: {
+        listPlusTodoCount: store => [
+            store.get.list.items,
+            store.get.list.todo.items,
+
+            (listItems, todoItems) => {
+                return listItems.length + todoItems.length
+            },
+        ],
     },
 
     modules: {
@@ -73,7 +84,21 @@ const storeConfig = () => ({
                 count: store => [store.get.items, items => items.length],
             },
 
+            listeners: {
+                counter: {
+                    inc: mockCounterIncListener,
+                },
+            },
+
             modules: {
+                another: {
+                    listeners: {
+                        todo: {
+                            add: mockTodoAddListener,
+                        },
+                    },
+                },
+
                 todo: {
                     state: {
                         items: [],
@@ -100,17 +125,6 @@ const storeConfig = () => ({
             },
         },
     },
-
-    selectors: {
-        listPlusTodoCount: store => [
-            store.get.list.items,
-            store.get.list.todo.items,
-
-            (listItems, todoItems) => {
-                return listItems.length + todoItems.length
-            },
-        ],
-    },
 })
 
 describe('Experimental Store', () => {
@@ -121,6 +135,7 @@ describe('Experimental Store', () => {
             counter: 1,
             list: {
                 items: [],
+                another: {},
                 todo: {
                     items: [],
                 },
@@ -130,6 +145,7 @@ describe('Experimental Store', () => {
         expect(store.get.counter()).toBe(1)
         expect(store.get.list()).toEqual({
             items: [],
+            another: {},
             todo: {
                 items: [],
             },
@@ -139,8 +155,10 @@ describe('Experimental Store', () => {
         expect(store.get.list.todo.items()).toEqual([])
     })
 
-    it('select & commit & subscribe', () => {
-        const store = new Store(storeConfig())
+    it('select & commit & subscribe & on.reducers', () => {
+        const mockCounterIncListener = jest.fn()
+        const mockTodoAddListener = jest.fn()
+        const store = new Store(storeConfig(mockCounterIncListener, mockTodoAddListener))
         const mockSubscribe = jest.fn()
 
         const unsubscribe = store.subscribe(mockSubscribe)
@@ -156,6 +174,8 @@ describe('Experimental Store', () => {
 
         store.commit.list.todo.add()
 
+        expect(mockCounterIncListener).toHaveBeenCalledTimes(2)
+        expect(mockTodoAddListener).toHaveBeenCalledTimes(1)
         expect(mockSubscribe).toHaveBeenCalledTimes(2)
         expect(store.select.counter.count()).toBe(3)
         expect(store.select.list.count()).toBe(1)
