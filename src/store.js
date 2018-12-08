@@ -1,4 +1,9 @@
 import { createSelector } from 'reselect'
+import produce from 'immer'
+
+function assert(condition, msg) {
+    if (!condition) throw new Error(`[@anew] ${msg}`)
+}
 
 export default class Store {
     constructor(options) {
@@ -10,14 +15,27 @@ export default class Store {
     use({
         state = this.state || {},
         reducers = this.reducers || {},
+        mutations = this.mutations || {},
         actions = this.actions || {},
         getters = this.getters || {},
         selectors = this.selectors || {},
         listeners = this.listeners || {},
         modules = this.modules,
     } = {}) {
+        if (process.env.NODE_ENV !== 'production') {
+            if (mutations) {
+                const stateType = typeof state
+
+                assert(
+                    stateType === 'object',
+                    `state must be an object to use mutations (state: ${stateType})`
+                )
+            }
+        }
+
         // Assign Options
         this.state = state
+        this.mutations = mutations
         this.reducers = reducers
         this.actions = actions
         this.getters = getters
@@ -37,6 +55,7 @@ export default class Store {
         this._installModules(modules, this)
         this._installGetters(getters, this.get)
         this._installSelectors(selectors, this.select, { get: this.get, select: this.select })
+        this._installMutations(mutations, this.commit, this.state, this.get)
         this._installReducers(reducers, this.commit, this.state, {}, this.get)
         this._installActions(actions, this.dispatch, this)
         this._installListeners(this.listeners, this._listeners, this.state, this)
@@ -50,6 +69,16 @@ export default class Store {
     _installModules(modules = {}, storage) {
         Object.entries(modules).forEach(([moduleName, module]) => {
             if (module.state === undefined) module.state = {}
+            if (process.env.NODE_ENV !== 'production') {
+                if (module.mutations) {
+                    const stateType = typeof module.state
+
+                    assert(
+                        stateType === 'object',
+                        `state must be an object to use mutations (state: ${stateType}, for: ${moduleName})`
+                    )
+                }
+            }
 
             Object.keys(module).forEach(type => {
                 switch (type) {
@@ -57,6 +86,8 @@ export default class Store {
                         this._installModules(module.modules, module)
                         break
                     default:
+                        if (!storage[type]) storage[type] = {}
+
                         storage[type][moduleName] = module[type]
                         break
                 }
@@ -98,44 +129,55 @@ export default class Store {
         })
     }
 
+    _installMutations(mutations, storage, state, getState, prefix = '') {
+        Object.entries(mutations).forEach(([mutationName, mutation]) => {
+            const path = prefix + mutationName
+
+            switch (typeof mutation) {
+                case 'function':
+                    storage[mutationName] = (...args) => {
+                        state = Object.assign(
+                            state,
+                            produce(state, draft => mutation(draft, ...args))
+                        )
+                        this._notifiyListeners(path, ...args)
+                        this._notifiySubscriptions()
+                        return state
+                    }
+                    break
+                case 'object':
+                    storage[mutationName] = {}
+
+                    this._installMutations(
+                        mutation,
+                        storage[mutationName],
+                        state[mutationName],
+                        () => getState()[mutationName],
+                        path + '/'
+                    )
+                    break
+            }
+        })
+    }
+
     _installReducers(reducers, storage, state, parentState, getState, prefix = '', stateKey) {
         Object.entries(reducers).forEach(([reducerName, reducer]) => {
             const path = prefix + reducerName
 
             switch (typeof reducer) {
                 case 'function':
-                    let updateState
-
                     if (stateKey) {
-                        if (typeof parentState[stateKey] === 'object') {
-                            updateState = change => {
-                                parentState[stateKey] = Object.assign(parentState[stateKey], change)
-                            }
-                        } else {
-                            updateState = change => {
-                                parentState[stateKey] = change
-                            }
-                        }
-
+                        // if target state is primitive value
                         storage[reducerName] = (...args) => {
-                            updateState(reducer(getState(), ...args))
+                            parentState[stateKey] = reducer(getState(), ...args)
                             this._notifiyListeners(path, ...args)
                             this._notifiySubscriptions()
                             return parentState[stateKey]
                         }
                     } else {
-                        if (typeof state === 'object') {
-                            updateState = change => {
-                                state = Object.assign(state, change)
-                            }
-                        } else {
-                            updateState = change => {
-                                state = change
-                            }
-                        }
-
+                        // if target state is object
                         storage[reducerName] = (...args) => {
-                            updateState(reducer(getState(), ...args))
+                            state = Object.assign(state, reducer(getState(), ...args))
                             this._notifiyListeners(path, ...args)
                             this._notifiySubscriptions()
                             return state

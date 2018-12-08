@@ -66,11 +66,9 @@ const storeConfig = (mockCounterIncListener, mockTodoAddListener) => ({
                 items: [],
             },
 
-            reducers: {
+            mutations: {
                 add(state, add = 1) {
-                    return {
-                        items: [...state.items, add],
-                    }
+                    state.items.push(add)
                 },
             },
 
@@ -104,11 +102,9 @@ const storeConfig = (mockCounterIncListener, mockTodoAddListener) => ({
                         items: [],
                     },
 
-                    reducers: {
+                    mutations: {
                         add(state, add = 2) {
-                            return {
-                                items: [...state.items, add],
-                            }
+                            state.items.push(add)
                         },
                     },
 
@@ -155,7 +151,7 @@ describe('Experimental Store', () => {
         expect(store.get.list.todo.items()).toEqual([])
     })
 
-    it('select & commit & subscribe & on.reducers', () => {
+    it('select & commit & subscribe & listeners', () => {
         const mockCounterIncListener = jest.fn()
         const mockTodoAddListener = jest.fn()
         const store = new Store(storeConfig(mockCounterIncListener, mockTodoAddListener))
