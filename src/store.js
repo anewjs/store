@@ -64,7 +64,16 @@ export default class Store {
                     default:
                         if (!storage[type]) storage[type] = {}
 
-                        storage[type][moduleName] = module[type]
+                        if (storage[type][moduleName]) {
+                            storage[type][moduleName] = Object.assign(
+                                {},
+                                module[type],
+                                storage[type][moduleName]
+                            )
+                        } else {
+                            storage[type][moduleName] = module[type]
+                        }
+
                         break
                 }
             })
