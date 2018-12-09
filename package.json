@@ -1,6 +1,6 @@
 {
     "name": "@anew/store-beta",
-    "version": "1.0.6",
+    "version": "1.0.7",
     "description": "Anew State Manager",
     "main": "lib/index.js",
     "author": "Abdelrahman Salem <abubakir1997@gmail.com> (http://www.pages.drexel.edu/\\~aas372/)",
