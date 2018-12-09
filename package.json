@@ -25,8 +25,14 @@
     },
     "keywords": [
         "anew",
+        "store",
         "redux",
+        "vuex",
+        "mobx",
+        "relay",
         "reducer",
+        "asynchronous",
+        "memoization",
         "state",
         "predictable",
         "functional",
@@ -41,10 +47,6 @@
         "url": "https://github.com/anewjs/store/issues"
     },
     "dependencies": {
-        "immer": "^1.8.0",
-        "invariant": "^2.2.4",
-        "redux": "^4.0.0",
-        "redux-persist": "^5.10.0",
         "reselect": "^3.0.1"
     },
     "devDependencies": {

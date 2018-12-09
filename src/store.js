@@ -1,9 +1,7 @@
 import { createSelector } from 'reselect'
-import produce from 'immer'
 
-function assert(condition, msg) {
-    if (!condition) throw new Error(`[@anew] ${msg}`)
-}
+import isPlainObject from './isPlainObject'
+import assert from './assert'
 
 export default class Store {
     constructor(options) {
@@ -15,27 +13,14 @@ export default class Store {
     use({
         state = this.state || {},
         reducers = this.reducers || {},
-        mutations = this.mutations || {},
         actions = this.actions || {},
         getters = this.getters || {},
         selectors = this.selectors || {},
         listeners = this.listeners || {},
         modules = this.modules,
     } = {}) {
-        if (process.env.NODE_ENV !== 'production') {
-            if (Object.keys(mutations).length) {
-                const stateType = typeof state
-
-                assert(
-                    stateType === 'object',
-                    `state must be an object to use mutations (state: ${stateType})`
-                )
-            }
-        }
-
         // Assign Options
-        this.state = state
-        this.mutations = mutations
+        this.state = typeof state === 'object' ? { ...state } : state
         this.reducers = reducers
         this.actions = actions
         this.getters = getters
@@ -56,8 +41,7 @@ export default class Store {
         this._installModules(modules, this)
         this._installGetters(getters, this.get)
         this._installSelectors(selectors, this.select, { get: this.get, select: this.select })
-        this._installMutations(mutations, this.commit, this.state, this.get)
-        this._installReducers(reducers, this.commit, this.state, {}, this.get)
+        this._installReducers(reducers, this.commit, this.state, this.get)
         this._installActions(actions, this.dispatch, this)
         this._installListeners(this.listeners, this._listeners, this.state, this)
     }
@@ -71,16 +55,6 @@ export default class Store {
         Object.entries(modules).forEach(([moduleName, module]) => {
             if (module.state === undefined) module.state = {}
             if (!module.getters) module.getters = {}
-            if (process.env.NODE_ENV !== 'production') {
-                if (module.mutations && Object.keys(module.mutations).length) {
-                    const stateType = typeof module.state
-
-                    assert(
-                        stateType === 'object',
-                        `state must be an object to use mutations (state: ${stateType}, for: ${moduleName})`
-                    )
-                }
-            }
 
             Object.keys(module).forEach(type => {
                 switch (type) {
@@ -97,15 +71,15 @@ export default class Store {
         })
     }
 
-    _installGetters(getters, storeGet) {
+    _installGetters(getters, getState) {
         Object.entries(getters).forEach(([getName, get]) => {
             switch (typeof get) {
                 case 'function':
-                    storeGet[getName] = (...args) => get(storeGet(), ...args)
+                    getState[getName] = (...args) => get(getState(), ...args)
                     break
                 case 'object':
-                    storeGet[getName] = () => storeGet()[getName]
-                    this._installGetters(get, storeGet[getName])
+                    getState[getName] = () => getState()[getName]
+                    this._installGetters(get, getState[getName])
                     break
             }
         })
@@ -115,8 +89,7 @@ export default class Store {
         Object.entries(selectors).forEach(([selectorName, selector]) => {
             switch (typeof selector) {
                 case 'function':
-                    const memoizedSelector = createSelector(...selector(store))
-                    storage[selectorName] = () => memoizedSelector(store.get())
+                    storage[selectorName] = createSelector(...selector(store))
                     break
                 case 'object':
                     storage[selectorName] = {}
@@ -131,99 +104,70 @@ export default class Store {
         })
     }
 
-    _installMutations(mutations, storage, state, getState, prefix = '') {
-        Object.entries(mutations).forEach(([mutationName, mutation]) => {
-            const path = prefix + mutationName
+    _installReducers(
+        reducers,
+        storage,
+        stateRef,
+        getState,
+        prefix = '',
+        propagate = typeof stateRef !== 'object'
+            ? change => (this.state = change)
+            : (change, containerName) => {
+                  this.state = Object.assign(
+                      {},
+                      this.state,
+                      containerName ? { [containerName]: change } : change
+                  )
 
-            switch (typeof mutation) {
-                case 'function':
-                    storage[mutationName] = (...args) => {
-                        state = Object.assign(
-                            state,
-                            produce(state, draft => mutation(draft, ...args))
-                        )
-                        this._notifiyListeners(path, ...args)
-                        this._notifiySubscriptions()
-                        return state
-                    }
-                    break
-                case 'object':
-                    storage[mutationName] = {}
-
-                    this._installMutations(
-                        mutation,
-                        storage[mutationName],
-                        state[mutationName],
-                        () => getState()[mutationName],
-                        path + '/'
-                    )
-                    break
-            }
-        })
-    }
-
-    _installReducers(reducers, storage, state, parentState, getState, prefix = '', stateKey) {
+                  return this.state
+              }
+    ) {
         Object.entries(reducers).forEach(([reducerName, reducer]) => {
             const path = prefix + reducerName
 
             switch (typeof reducer) {
                 case 'function':
-                    if (typeof state !== 'object' && !stateKey) {
-                        // if root state is primitive value
-                        storage[reducerName] = (...args) => {
-                            const change = reducer(this.state, ...args)
-                            this._stateHasChanged = change !== this.state
+                    storage[reducerName] = (...args) => {
+                        const change = reducer(getState(), ...args)
+                        this._stateHasChanged = change !== undefined && change !== stateRef
 
-                            if (this._stateHasChanged) {
-                                this.state = change
-                            }
-
-                            this._notifiyListeners(path, ...args)
-                            this._notifiySubscriptions()
-                            return this.state
+                        if (this._stateHasChanged) {
+                            propagate(change)
                         }
-                    } else if (stateKey) {
-                        // if target state is primitive value
-                        storage[reducerName] = (...args) => {
-                            const change = reducer(getState(), ...args)
-                            this._stateHasChanged = change !== parentState[stateKey]
 
-                            if (this._stateHasChanged) {
-                                parentState[stateKey] = change
-                            }
+                        this._notifiyListeners(path, getState(), ...args)
+                        this._notifiySubscriptions()
 
-                            this._notifiyListeners(path, ...args)
-                            this._notifiySubscriptions()
-                            return parentState[stateKey]
-                        }
-                    } else {
-                        // if target state is object
-                        storage[reducerName] = (...args) => {
-                            const change = reducer(getState(), ...args)
-                            this._stateHasChanged = change && change !== state
-
-                            if (this._stateHasChanged) {
-                                state = Object.assign(state, change)
-                            }
-
-                            this._notifiyListeners(path, ...args)
-                            this._notifiySubscriptions()
-                            return state
-                        }
+                        return change
                     }
                     break
                 case 'object':
                     storage[reducerName] = {}
-                    const childState = state[reducerName]
+
+                    const targetGetState = getState[reducerName]
+                    const targetState = typeof stateRef === 'object' && stateRef[reducerName]
+                    const objectInstance = isPlainObject(targetState) ? {} : []
+                    const nextPropogation =
+                        targetState && typeof targetState !== 'object'
+                            ? change => propagate({ [reducerName]: change })
+                            : (change, containerName) => {
+                                  return propagate(
+                                      Object.assign(
+                                          objectInstance,
+                                          targetGetState(),
+                                          containerName ? { [containerName]: change } : change
+                                      ),
+                                      reducerName
+                                  )
+                              }
 
                     this._installReducers(
                         reducer,
                         storage[reducerName],
-                        childState,
-                        state,
-                        () => getState()[reducerName],
+                        targetState,
+                        targetGetState,
                         path + '/',
-                        typeof childState !== 'object' && path
+                        nextPropogation || propagate
                     )
                     break
             }
@@ -282,7 +226,6 @@ export default class Store {
                 if (typeof target !== 'object') continue
 
                 const targetKeys = Object.keys(target)
-                const targetState = state[targetName]
 
                 for (let k = 0, targetLen = targetKeys.length; k < targetLen; k++) {
                     const reducerName = targetKeys[k]
@@ -294,12 +237,18 @@ export default class Store {
                             const prevListenerBinded = prevListener && prevListener.bind({})
 
                             if (prevListenerBinded) {
-                                storage[`${prefix}${targetName}/${reducerName}`] = (...args) => {
+                                storage[`${prefix}${targetName}/${reducerName}`] = (
+                                    targetState,
+                                    ...args
+                                ) => {
                                     prevListenerBinded(...args)
                                     return reducer(contextStore, targetState, ...args)
                                 }
                             } else {
-                                storage[`${prefix}${targetName}/${reducerName}`] = (...args) => {
+                                storage[`${prefix}${targetName}/${reducerName}`] = (
+                                    targetState,
+                                    ...args
+                                ) => {
                                     return reducer(contextStore, targetState, ...args)
                                 }
                             }
@@ -420,11 +369,11 @@ export default class Store {
         }
     }
 
-    _notifiyListeners = (path, ...args) => {
+    _notifiyListeners = (path, change, ...args) => {
         const listener = this._listeners[path]
 
         if (listener) {
-            listener(...args)
+            listener(change, ...args)
         }
     }
 }
