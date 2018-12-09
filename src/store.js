@@ -128,8 +128,9 @@ export default class Store {
             switch (typeof reducer) {
                 case 'function':
                     storage[reducerName] = (...args) => {
-                        const change = reducer(getState(), ...args)
-                        this._stateHasChanged = change !== undefined && change !== stateRef
+                        const state = getState()
+                        const change = reducer(state, ...args)
+                        this._stateHasChanged = change !== undefined && change !== state
 
                         if (this._stateHasChanged) {
                             propagate(change)

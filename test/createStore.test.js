@@ -78,6 +78,39 @@ describe('new Store', () => {
         expect(store.get()).toEqual({ count: 3 })
     })
 
+    test('prevent subscription call when no state changes', () => {
+        const store = new Store({
+            state: {
+                count: 0,
+            },
+
+            reducers: {
+                undefined() {},
+
+                noStateChange(state) {
+                    return state
+                },
+
+                inc(state) {
+                    return {
+                        count: state.count + 1,
+                    }
+                },
+            },
+        })
+
+        const mockSubscribe = jest.fn()
+
+        store.subscribe(mockSubscribe)
+
+        store.commit.undefined()
+        store.commit.inc()
+        store.commit.noStateChange()
+
+        expect(mockSubscribe).toHaveBeenCalledTimes(1)
+        expect(store.get()).toEqual({ count: 1 })
+    })
+
     test('dispatch action', () => {
         const store = new Store(counterStore)
 
