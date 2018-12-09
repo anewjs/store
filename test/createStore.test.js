@@ -1,328 +1,191 @@
-import invariant from 'invariant'
-
-import createStore, { createTestEnv, ActionTypes } from '..'
+import Store from '../src/store'
 import counterStore from './stores/counter'
 
-jest.mock('invariant')
-
-describe('createStore', () => {
+describe('new Store', () => {
     test('create empty store', () => {
-        const store = createStore()
-        const dispatchKeys = Object.keys(store.dispatch)
+        const store = new Store({})
+        const storeKeys = Object.keys(store)
 
-        expect(store.anew.name).toBe('store')
-        expect(store.getState()).toEqual({})
+        expect(store.get()).toEqual({})
 
-        expect(dispatchKeys).toContain('reducers')
-        expect(dispatchKeys).toContain('effects')
-        expect(dispatchKeys).toContain('actions')
-        expect(dispatchKeys).toContain('batch')
+        expect(storeKeys).toContain('commit')
+        expect(storeKeys).toContain('dispatch')
+        expect(storeKeys).toContain('stage')
+        expect(storeKeys).toContain('get')
+        expect(storeKeys).toContain('select')
+        expect(storeKeys).toContain('subscribe')
     })
 
-    test('create namespaced store', () => {
-        const store = createStore({
-            name: 'todo',
-        })
+    test('modify store after initiation', () => {
+        const store = new Store({})
 
-        expect(store.anew.name).toBe('todo')
-    })
-
-    test('creating namespace with a function property throws error', () => {
-        const store = createStore({
-            name: 'name',
-        })
-
-        expect(invariant).toHaveBeenCalled()
-    })
-
-    test('get initial state', () => {
-        const store = createStore({
+        store.use({
             state: 1,
         })
 
-        expect(store.getState()).toBe(1)
+        store.use({
+            getters: {
+                double(state) {
+                    return state * 2
+                },
+            },
+        })
+
+        expect(store.get()).toEqual(1)
+        expect(store.get.double()).toEqual(2)
     })
 
-    test('preserve state reference', () => {
+    test('get initial state', () => {
+        const store = new Store({
+            state: 1,
+        })
+
+        expect(store.get()).toBe(1)
+    })
+
+    test('new state reference', () => {
         const state = { name: 'Hello' }
-        const store = createStore({
-            state,
+        const store = new Store({ state })
+
+        expect(store.get()).not.toBe(state)
+        expect(store.state).not.toBe(state)
+    })
+
+    test('commit reducer', () => {
+        const store = new Store(counterStore)
+
+        store.commit.inc()
+        store.commit.inc()
+        store.commit.inc()
+
+        expect(store.get()).toEqual({ count: 3 })
+    })
+
+    test('stage commits', () => {
+        const store = new Store(counterStore)
+        const mockSubscribe = jest.fn()
+
+        store.subscribe(mockSubscribe)
+        store.stage()
+
+        store.commit.inc()
+        store.commit.inc()
+        store.commit.inc()
+
+        store.stage.commit()
+
+        expect(mockSubscribe).toHaveBeenCalledTimes(1)
+        expect(store.get()).toEqual({ count: 3 })
+    })
+
+    test('prevent subscription call when no state changes', () => {
+        const store = new Store({
+            state: {
+                count: 0,
+            },
 
             reducers: {
-                setState: (state, nextState) => nextState,
+                undefined() {},
+
+                noStateChange(state) {
+                    return state
+                },
+
+                inc(state) {
+                    return {
+                        count: state.count + 1,
+                    }
+                },
             },
         })
 
-        store.dispatch.reducers.setState(state)
+        const mockSubscribe = jest.fn()
 
-        expect(store.getState()).toBe(state)
-    })
+        store.subscribe(mockSubscribe)
 
-    test('State not an object with persist throws an error', () => {
-        const store = createStore({
-            state: [],
+        store.commit.undefined()
+        store.commit.inc()
+        store.commit.noStateChange()
 
-            persist: true,
-        })
-
-        expect(invariant).toHaveBeenCalled()
-    })
-
-    test('persist initial state', () => {
-        const store = createStore({
-            state: {},
-
-            persist: true,
-        })
-
-        expect(store.getState()).toEqual({
-            _persist: {
-                rehydrated: false,
-                version: -1,
-            },
-        })
-    })
-
-    test('Create persistor store', () => {
-        const store = createStore({ persist: true })
-        const methods = Object.keys(store.dispatch.persistor)
-
-        expect(typeof store.persistor).toBe('object')
-        expect(typeof store.getState.persistor).toBe('function')
-        expect(typeof store.dispatch.persistor).toBe('function')
-        expect(methods).toContain('flush')
-        expect(methods).toContain('pause')
-        expect(methods).toContain('persist')
-        expect(methods).toContain('purge')
-    })
-
-    test('dispatch reducer', () => {
-        const store = createStore(counterStore)
-
-        store.dispatch.reducers.inc()
-        store.dispatch.reducers.inc()
-        store.dispatch.reducers.inc()
-
-        expect(store.getState()).toEqual({ count: 3 })
-    })
-
-    test('dispatch batch', () => {
-        const store = createStore(counterStore)
-
-        store.dispatch.batch.inc()
-        store.dispatch.batch.inc()
-        store.dispatch.batch.inc()
-        store.dispatch.batch.done()
-
-        expect(store.getState()).toEqual({ count: 3 })
+        expect(mockSubscribe).toHaveBeenCalledTimes(1)
+        expect(store.get()).toEqual({ count: 1 })
     })
 
     test('dispatch action', () => {
-        const store = createStore(counterStore)
+        const store = new Store(counterStore)
 
-        store.dispatch.actions.inc()
-        store.dispatch.actions.inc()
-        store.dispatch.actions.inc()
-
-        expect(store.getState()).toEqual({ count: 3 })
-    })
-
-    test('dispatch effect', () => {
-        const store = createStore(counterStore)
-
-        store.dispatch.effects.inc().then(() => {
-            store.dispatch.effects.inc().then(() => {
-                expect(store.getState()).toEqual({ count: 2 })
+        store.dispatch.inc().then(() => {
+            store.dispatch.inc().then(() => {
+                expect(store.get()).toEqual({ count: 2 })
             })
         })
     })
 
     test('dispatch mix', () => {
-        const store = createStore(counterStore)
+        const store = new Store(counterStore)
 
-        store.dispatch.effects.inc().then(() => {
-            store.dispatch.batch.inc()
-            store.dispatch.reducers.inc()
-            store.dispatch.actions.inc()
+        store.dispatch.inc().then(() => {
+            store.stage()
+            store.commit.inc()
+            store.stage.commit()
 
-            expect(store.getState()).toEqual({ count: 4 })
+            store.commit.inc()
+
+            expect(store.get()).toEqual({ count: 3 })
         })
     })
 
-    test('dispatch batch on done flag', () => {
-        const store = createStore(counterStore)
+    test('stage commits asynchronously', () => {
+        const store = new Store(counterStore)
 
-        store.dispatch.batch.inc()
-        store.dispatch.batch.inc()
-
-        expect(store.getState()).toEqual({ count: 0 })
-
-        store.dispatch.batch.inc()
-        store.dispatch.batch.done()
-
-        expect(store.getState()).toEqual({ count: 3 })
-    })
-
-    test('dispatch batch in asynchronously', () => {
-        const store = createStore(counterStore)
-
-        store.dispatch.batch.inc()
-        store.dispatch.batch.inc()
+        store.stage()
+        store.commit.inc()
+        store.commit.inc()
 
         setTimeout(() => {
-            store.dispatch.batch.inc()
-            store.dispatch.batch.done()
+            store.commit.inc()
+            store.stage.commit()
 
-            expect(store.getState()).toEqual({ count: 3 })
+            expect(store.get()).toEqual({ count: 3 })
         }, 300)
 
-        store.dispatch.batch.done()
+        store.stage.commit()
 
-        expect(store.getState()).toEqual({ count: 2 })
+        expect(store.get()).toEqual({ count: 2 })
     })
 
-    test('dispatch batch excluding last one', () => {
-        const store = createStore(counterStore)
+    test('create anew getters', () => {
+        const store = new Store(counterStore)
 
-        store.dispatch.batch.inc()
-        store.dispatch.batch.inc()
-        store.dispatch.batch.inc()
+        store.commit.inc()
 
-        store.anew.getBatches().pop()
-
-        store.dispatch.batch.done()
-
-        expect(store.getState()).toEqual({ count: 2 })
-    })
-
-    test('dispatch batch with reducer instead of done flag', () => {
-        const store = createStore(counterStore)
-
-        store.dispatch.batch.inc()
-        store.dispatch.batch.inc()
-        store.dispatch.reducers.inc()
-
-        expect(store.getState()).toEqual({ count: 3 })
-    })
-
-    test('reset to initial state', () => {
-        const store = createStore(counterStore)
-
-        store.dispatch.reducers.inc()
-        store.dispatch({ type: ActionTypes.RESET })
-
-        expect(store.getState()).toEqual({ count: 0 })
-    })
-
-    test('reserved reducer name throws error', () => {
-        const store = createStore({
-            reducers: {
-                done: {},
-            },
-        })
-
-        expect(invariant).toHaveBeenCalled()
-    })
-
-    test('selector name as a function property throws error', () => {
-        const store = createStore({
-            selectors: {
-                name: () => {},
-            },
-        })
-
-        expect(invariant).toHaveBeenCalled()
-    })
-
-    test('creating test environment returns store creator', () => {
-        const store = createStore(counterStore)
-        const createCounterStore = createTestEnv(store)
-        const counterStore = createCounterStore()
-        const methods = Object.keys(counterStore)
-        const anewMethods = Object.keys(counterStore.anew)
-
-        expect(typeof createCounterStore).toBe('function')
-
-        expect(methods.length).toBe(5)
-        expect(methods).toContain('anew')
-        expect(methods).toContain('subscribe')
-        expect(methods).toContain('dispatch')
-        expect(methods).toContain('getState')
-        expect(methods).toContain('replaceReducer')
-
-        expect(anewMethods.length).toBe(3)
-        expect(anewMethods).toContain('getBatches')
-        expect(anewMethods).toContain('reducer')
-        expect(anewMethods).toContain('name')
-    })
-
-    test('create anew simple selector', () => {
-        const store = createStore(counterStore)
-
-        store.dispatch.reducers.inc()
-
-        expect(store.getState.count()).toBe(1)
-        expect(store.getState.countDoubled()).toBe(2)
-    })
-
-    test('create anew prop selector', () => {
-        const store = createStore(counterStore)
-
-        store.dispatch.reducers.inc()
-
-        expect(store.getState.add()).toBe(1)
-        expect(store.getState.add({}, { add: 2 })).toBe(2)
-        expect(store.getState.countAdd()).toBe(2)
-        expect(store.getState.countAdd({ add: 4 })).toBe(5)
+        expect(store.get.count()).toBe(1)
+        expect(store.get.countDoubled()).toBe(2)
     })
 
     test('create anew memoized selector', () => {
-        const countDoubledAdd = jest.fn((doubled, add) => {
-            return doubled + add
+        const countDoubled = jest.fn(doubled => {
+            return doubled
         })
 
-        const store = createStore({
+        const store = new Store({
             ...counterStore,
             state: {
                 count: 1,
             },
 
             selectors: {
-                ...counterStore.selectors,
-
-                countDoubledAdd: store =>
-                    store.create([store.select.countDoubled, store.select.add], countDoubledAdd),
+                countDoubled: store => [store.get.countDoubled, countDoubled],
             },
         })
 
-        const value1 = store.getState.countDoubledAdd()
-        const value2 = store.getState.countDoubledAdd()
-        const value3 = store.getState.countDoubledAdd()
-        const value4 = store.getState.countDoubledAdd({ add: 2 })
+        const value1 = store.select.countDoubled()
+        const value2 = store.select.countDoubled()
+        const value3 = store.select.countDoubled()
 
-        expect(value1).toBe(3)
-        expect(value2).toBe(3)
-        expect(value3).toBe(3)
-        expect(value4).toBe(4)
-        expect(countDoubledAdd).toHaveBeenCalledTimes(2)
-    })
-
-    test('one batch calls reducer once', () => {
-        const spyReducer = jest.fn(() => {})
-
-        const store = createStore({
-            ...counterStore,
-            reducer: spyReducer,
-        })
-
-        store.dispatch.batch.inc()
-        store.dispatch.batch.inc()
-        store.dispatch.batch.inc()
-        store.dispatch.batch.inc()
-        store.dispatch.batch.done()
-
-        // Once for initialization and the other for the batch
-        expect(spyReducer).toHaveBeenCalledTimes(2)
-        expect(store.getState()).toEqual({ count: 4 })
+        expect(value1).toBe(2)
+        expect(value2).toBe(2)
+        expect(value3).toBe(2)
+        expect(countDoubled).toHaveBeenCalledTimes(1)
     })
 })

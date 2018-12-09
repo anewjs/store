@@ -1,6 +1,4 @@
 export default {
-    name: 'counter',
-
     state: {
         count: 0,
     },
@@ -9,11 +7,11 @@ export default {
         inc: state => ({ count: state.count + 1 }),
     },
 
-    effects: {
-        inc({ dispatch }) {
+    actions: {
+        inc({ commit }) {
             return new Promise(resolve => {
                 setTimeout(() => {
-                    dispatch.inc()
+                    commit.inc()
 
                     resolve()
                 }, 300)
@@ -21,27 +19,13 @@ export default {
         },
     },
 
-    actions: {
-        inc() {
-            return {
-                type: 'counter:inc',
-            }
-        },
+    getters: {
+        count: state => state.count,
+
+        countDoubled: state => state.count * 2,
     },
 
     selectors: {
-        // Prop Selectors
-        add: store => store.create('add', 1),
-
-        // Simple Selectors
-        count: store => store.create(state => state.count),
-
-        countDoubled: store => store.create(state => state.count * 2),
-
-        // Selectors
-        countAdd: store =>
-            store.create([store.select.count, store.select.add], (count, add) => {
-                return count + add
-            }),
+        countAdd: store => [store.get.count, count => count],
     },
 }
