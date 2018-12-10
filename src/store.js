@@ -10,15 +10,26 @@ export default class Store {
         }
     }
 
-    use({
-        state = this.state || {},
-        reducers = this.reducers || {},
-        actions = this.actions || {},
-        getters = this.getters || {},
-        selectors = this.selectors || {},
-        listeners = this.listeners || {},
-        modules = this.modules,
-    } = {}) {
+    use({ plugins = [], ...options } = {}) {
+        // Initialize Listeners
+        this._subscriptions = []
+        this._nextSubscriptions = this._subscriptions
+        this._listeners = {}
+        this._stateHasChanged = false
+
+        // Modify Options
+        this._installPlugins(plugins, options)
+
+        const {
+            state = this.state || {},
+            reducers = this.reducers || {},
+            actions = this.actions || {},
+            getters = this.getters || {},
+            selectors = this.selectors || {},
+            listeners = this.listeners || {},
+            modules = this.modules,
+        } = options
+
         // Assign Options
         this.state = typeof state === 'object' ? { ...state } : state
         this.reducers = reducers
@@ -27,12 +38,6 @@ export default class Store {
         this.selectors = selectors
         this.listeners = listeners
         this.modules = modules
-
-        // Initialize Listeners
-        this._subscriptions = []
-        this._nextSubscriptions = this._subscriptions
-        this._listeners = {}
-        this._stateHasChanged = false
 
         // Initialize Store
         this._initStore()
@@ -44,6 +49,17 @@ export default class Store {
         this._installReducers(reducers, this.commit, this.state, this.get)
         this._installActions(actions, this.dispatch, this)
         this._installListeners(this.listeners, this._listeners, this.state, this)
+    }
+
+    _installPlugins(plugins, options) {
+        if (plugins.length) {
+            const param = {
+                get: () => options,
+                inject: update => (options = Object.assign(options, update)),
+            }
+
+            plugins.forEach(plugin => plugin(this, param))
+        }
     }
 
     _initStore() {
