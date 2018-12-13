@@ -32,7 +32,7 @@ export default class Store {
 
         // Assign Options
         this.state = typeof state === 'object' ? { ...state } : state
-        this.reducers = reducers
+        this.reducers = Object.assign(reducers, { push: this._push })
         this.actions = actions
         this.getters = getters
         this.selectors = selectors
@@ -49,6 +49,9 @@ export default class Store {
         this._installReducers(reducers, this.commit, this.state, this.get)
         this._installActions(actions, this.dispatch, this)
         this._installListeners(this.listeners, this._listeners, this.state, this)
+
+        // Extend Commit Functionality
+        this._extendCommit()
     }
 
     _installPlugins(plugins, options) {
@@ -64,13 +67,13 @@ export default class Store {
 
     _initStore() {
         this.select = {}
-        this.stage.commit = this._stageCommit
     }
 
     _installModules(modules = {}, storage) {
         Object.entries(modules).forEach(([moduleName, module]) => {
             if (module.state === undefined) module.state = {}
             if (!module.getters) module.getters = {}
+            if (!module.reducers) module.reducers = {}
 
             Object.keys(module).forEach(type => {
                 switch (type) {
@@ -92,6 +95,11 @@ export default class Store {
 
                         break
                 }
+            })
+
+            // push reducer
+            storage.reducers[moduleName] = Object.assign({}, storage.reducers[moduleName], {
+                push: this._push,
             })
         })
     }
@@ -162,13 +170,15 @@ export default class Store {
                         }
 
                         this._notifiyListeners(path, getState(), ...args)
-                        this._notifiySubscriptions()
+                        this._notifiySubscriptions(path, args)
 
                         return change
                     }
                     break
                 case 'object':
-                    storage[reducerName] = {}
+                    storage[reducerName] = (target, ...args) =>
+                        this.commit(path + (target ? `/${target}` : ''), ...args)
+                    storage[reducerName].stage = this._stage
 
                     const targetGetState = getState[reducerName]
                     const targetState = typeof stateRef === 'object' && stateRef[reducerName]
@@ -206,7 +216,12 @@ export default class Store {
 
             switch (typeof action) {
                 case 'function':
-                    storage[actionName] = (...args) => action(store, ...args)
+                    storage[actionName] = (...args) => {
+                        this._stage()
+                        const result = action(store, ...args)
+                        this._stagePush(path + '+', args)
+                        return result
+                    }
                     break
                 case 'object':
                     storage[actionName] = {}
@@ -218,7 +233,6 @@ export default class Store {
                             get: store.get[actionName],
                             dispatch: store.dispatch[actionName],
                             commit: store.commit[actionName],
-                            stage: this.stage,
                             core: this,
                         },
                         path + '/'
@@ -241,7 +255,6 @@ export default class Store {
                 get: store.get[contextName] || {},
                 dispatch: store.dispatch[contextName] || {},
                 commit: store.commit[contextName] || {},
-                stage: this.stage,
                 core: this,
             }
 
@@ -293,6 +306,11 @@ export default class Store {
                 }
             }
         }
+    }
+
+    _extendCommit() {
+        this._stage.push = this._stagePush
+        this.commit.stage = this._stage
     }
 
     /**
@@ -362,10 +380,6 @@ export default class Store {
         }, this.commit)
     }
 
-    stage = () => {
-        this.isStaging = true
-    }
-
     /**
      | ------------------
      | Internal API
@@ -373,10 +387,18 @@ export default class Store {
      |
      */
 
-    _stageCommit = () => {
+    _push = (state, change) => {
+        return typeof change === 'function' ? change(state) : change
+    }
+
+    _stage = () => {
+        this.isStaging = true
+    }
+
+    _stagePush = (path, args) => {
         if (this.isStaging) {
             this.isStaging = false
-            this._notifiySubscriptions()
+            this._notifiySubscriptions(path, args)
         }
     }
 
@@ -386,12 +408,12 @@ export default class Store {
         }
     }
 
-    _notifiySubscriptions = () => {
+    _notifiySubscriptions = (path, args) => {
         if (!this.isStaging && this._stateHasChanged) {
             this._stateHasChanged = false
             const listeners = (this._subscriptions = this._nextSubscriptions)
 
-            listeners.forEach(listener => listener())
+            listeners.forEach(listener => listener(path, args))
         }
     }
 
