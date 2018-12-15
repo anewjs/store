@@ -27,16 +27,25 @@ export default class Store {
             getters = this.getters || {},
             selectors = this.selectors || {},
             listeners = this.listeners || {},
+            enhance = this.enhance || {},
             modules = this.modules,
         } = options
 
         // Assign Options
-        this.state = typeof state === 'object' ? { ...state } : state
+        if (typeof state === 'object') {
+            const { __esModule, ...cleanState } = state
+
+            this.state = cleanState
+        } else {
+            this.state = state
+        }
+
         this.reducers = Object.assign(reducers, { push: this._push })
         this.actions = actions
         this.getters = getters
         this.selectors = selectors
         this.listeners = listeners
+        this.enhance = enhance
         this.modules = modules
 
         // Initialize Store
@@ -58,7 +67,11 @@ export default class Store {
         if (plugins.length) {
             const param = {
                 get: () => options,
-                inject: update => (options = Object.assign(options, update)),
+                inject: updates => {
+                    Object.entries(updates).forEach(([updateType, update]) => {
+                        options[updateType] = Object.assign(options[updateType] || {}, update)
+                    })
+                },
             }
 
             plugins.forEach(plugin => plugin(this, param))
@@ -80,6 +93,12 @@ export default class Store {
                     case 'modules':
                         this._installModules(module.modules, module)
                         break
+                    case 'state':
+                        if (typeof module.state === 'object') {
+                            const { __esModule, ...cleanState } = module.state
+
+                            module.state = cleanState
+                        }
                     default:
                         if (!storage[type]) storage[type] = {}
 
@@ -211,16 +230,32 @@ export default class Store {
     }
 
     _installActions(actions, storage, store, prefix = '') {
+        const enhanceActions = this.enhance.actions
+
         Object.entries(actions).forEach(([actionName, action]) => {
             const path = prefix + actionName
 
             switch (typeof action) {
                 case 'function':
-                    storage[actionName] = (...args) => {
-                        this._stage()
-                        const result = action(store, ...args)
-                        this._stagePush(path + '+', args)
-                        return result
+                    if (enhanceActions) {
+                        storage[actionName] = (...args) => {
+                            this._stage()
+                            const result = action(store, ...args)
+
+                            if (result !== undefined) {
+                                store.commit.push(result)
+                            }
+
+                            this._stagePush(path + '+', args)
+                            return result
+                        }
+                    } else {
+                        storage[actionName] = (...args) => {
+                            this._stage()
+                            const result = action(store, ...args)
+                            this._stagePush(path + '+', args)
+                            return result
+                        }
                     }
                     break
                 case 'object':
@@ -272,23 +307,33 @@ export default class Store {
 
                     switch (typeof reducer) {
                         case 'function':
-                            const prevListener = context[`${prefix}${targetName}/${reducerName}`]
+                            const path = `${prefix}${targetName}/${reducerName}`
+                            const listenerPath = `${contextName}(${path})`
+                            const prevListener = storage[path]
                             const prevListenerBinded = prevListener && prevListener.bind({})
 
                             if (prevListenerBinded) {
-                                storage[`${prefix}${targetName}/${reducerName}`] = (
-                                    targetState,
-                                    ...args
-                                ) => {
+                                storage[path] = (targetState, ...args) => {
                                     prevListenerBinded(...args)
-                                    return reducer(contextStore, targetState, ...args)
+                                    this._stage()
+                                    const result = reducer(contextStore, targetState, ...args)
+
+                                    if (result !== undefined) {
+                                        contextStore.commit.push(result)
+                                    }
+
+                                    this._stagePush(listenerPath, args)
                                 }
                             } else {
-                                storage[`${prefix}${targetName}/${reducerName}`] = (
-                                    targetState,
-                                    ...args
-                                ) => {
-                                    return reducer(contextStore, targetState, ...args)
+                                storage[path] = (targetState, ...args) => {
+                                    this._stage()
+                                    const result = reducer(contextStore, targetState, ...args)
+
+                                    if (result !== undefined) {
+                                        contextStore.commit.push(result)
+                                    }
+
+                                    this._stagePush(listenerPath, args)
                                 }
                             }
 
