@@ -5,15 +5,21 @@ describe('new Store', () => {
     test('create empty store', () => {
         const store = new Store({})
         const storeKeys = Object.keys(store)
+        const commitKeys = Object.keys(store.commit)
+        const stageKeys = Object.keys(store.commit.stage)
 
         expect(store.get()).toEqual({})
 
         expect(storeKeys).toContain('commit')
         expect(storeKeys).toContain('dispatch')
-        expect(storeKeys).toContain('stage')
         expect(storeKeys).toContain('get')
         expect(storeKeys).toContain('select')
         expect(storeKeys).toContain('subscribe')
+
+        expect(commitKeys).toContain('stage')
+        expect(commitKeys).toContain('push')
+
+        expect(stageKeys).toContain('push')
     })
 
     test('modify store after initiation', () => {
@@ -66,13 +72,13 @@ describe('new Store', () => {
         const mockSubscribe = jest.fn()
 
         store.subscribe(mockSubscribe)
-        store.stage()
+        store.commit.stage()
 
         store.commit.inc()
         store.commit.inc()
         store.commit.inc()
 
-        store.stage.commit()
+        store.commit.stage.push()
 
         expect(mockSubscribe).toHaveBeenCalledTimes(1)
         expect(store.get()).toEqual({ count: 3 })
@@ -125,9 +131,9 @@ describe('new Store', () => {
         const store = new Store(counterStore)
 
         store.dispatch.inc().then(() => {
-            store.stage()
+            store.commit.stage()
             store.commit.inc()
-            store.stage.commit()
+            store.commit.stage.push()
 
             store.commit.inc()
 
@@ -138,18 +144,18 @@ describe('new Store', () => {
     test('stage commits asynchronously', () => {
         const store = new Store(counterStore)
 
-        store.stage()
+        store.commit.stage()
         store.commit.inc()
         store.commit.inc()
 
         setTimeout(() => {
             store.commit.inc()
-            store.stage.commit()
+            store.commit.stage.push()
 
             expect(store.get()).toEqual({ count: 3 })
         }, 300)
 
-        store.stage.commit()
+        store.commit.stage.push()
 
         expect(store.get()).toEqual({ count: 2 })
     })
@@ -181,11 +187,14 @@ describe('new Store', () => {
 
         const value1 = store.select.countDoubled()
         const value2 = store.select.countDoubled()
+
+        store.commit.inc()
+
         const value3 = store.select.countDoubled()
 
         expect(value1).toBe(2)
         expect(value2).toBe(2)
-        expect(value3).toBe(2)
-        expect(countDoubled).toHaveBeenCalledTimes(1)
+        expect(value3).toBe(4)
+        expect(countDoubled).toHaveBeenCalledTimes(2)
     })
 })

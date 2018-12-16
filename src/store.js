@@ -141,7 +141,9 @@ export default class Store {
         Object.entries(selectors).forEach(([selectorName, selector]) => {
             switch (typeof selector) {
                 case 'function':
-                    storage[selectorName] = createSelector(...selector(store))
+                    const memoizedSelector = createSelector(...selector(store))
+
+                    storage[selectorName] = (args = {}) => memoizedSelector(store.get(), args)
                     break
                 case 'object':
                     storage[selectorName] = {}
