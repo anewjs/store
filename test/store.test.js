@@ -197,4 +197,44 @@ describe('new Store', () => {
         expect(value3).toBe(4)
         expect(countDoubled).toHaveBeenCalledTimes(2)
     })
+
+    test('listeners called on commit', () => {
+        const mockListener = jest.fn()
+        const store = new Store({
+            modules: {
+                counter: counterStore,
+                listener: {
+                    state: {
+                        someState: null,
+                    },
+
+                    listeners: {
+                        counter: {
+                            inc(store, state, arg) {
+                                mockListener()
+
+                                expect(store.get()).toEqual({
+                                    someState: null,
+                                })
+
+                                expect(state).toEqual({
+                                    count: 1,
+                                })
+
+                                expect(arg).toEqual({
+                                    someArg: 100,
+                                })
+                            },
+                        },
+                    },
+                },
+            },
+        })
+
+        store.commit.counter.inc({
+            someArg: 100,
+        })
+
+        expect(mockListener).toHaveBeenCalled()
+    })
 })

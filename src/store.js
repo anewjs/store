@@ -316,7 +316,7 @@ export default class Store {
 
                             if (prevListenerBinded) {
                                 storage[path] = (targetState, ...args) => {
-                                    prevListenerBinded(...args)
+                                    prevListenerBinded(targetState, ...args)
                                     this._stage()
                                     const result = reducer(contextStore, targetState, ...args)
 
@@ -464,11 +464,11 @@ export default class Store {
         }
     }
 
-    _notifiyListeners = (path, change, ...args) => {
+    _notifiyListeners = (path, state, ...args) => {
         const listener = this._listeners[path]
 
         if (listener) {
-            listener(change, ...args)
+            listener(state, ...args)
         }
     }
 }
