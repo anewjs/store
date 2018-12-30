@@ -143,7 +143,11 @@ export default class Store {
                 case 'function':
                     const memoizedSelector = createSelector(...selector(store))
 
-                    storage[selectorName] = (args = {}) => memoizedSelector(store.get(), args)
+                    storage[selectorName] = (props = {}, args = {}) => {
+                        const state = store.get()
+
+                        return memoizedSelector(state, state === props ? args : props)
+                    }
                     break
                 case 'object':
                     storage[selectorName] = {}
