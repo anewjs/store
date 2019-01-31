@@ -54,7 +54,11 @@ export default class Store {
         // Install Options (From, To, ..args)
         this._installModules(modules, this)
         this._installGetters(getters, this.get)
-        this._installSelectors(selectors, this.select, { get: this.get, select: this.select })
+        this._installSelectors(selectors, this.select, {
+            get: this.get,
+            select: this.select,
+            prop: this._prop,
+        })
         this._installReducers(reducers, this.commit, this.state, this.get)
         this._installActions(actions, this.dispatch, this)
         this._installListeners(this.listeners, this._listeners, this.state, this)
@@ -155,6 +159,7 @@ export default class Store {
                     this._installSelectors(selector, storage[selectorName], {
                         get: store.get[selectorName],
                         select: store.select[selectorName],
+                        prop: this._prop,
                         core: this,
                     })
                     break
@@ -474,5 +479,9 @@ export default class Store {
         if (listener) {
             listener(state, ...args)
         }
+    }
+
+    _prop = (propName, defaultValue) => {
+        return (s, { [propName]: propValue = defaultValue } = {}) => propValue
     }
 }
