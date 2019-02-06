@@ -19,8 +19,9 @@ yarn add @anew/store
 ## Docs
 
 ```js
-// @return Anew Store
-new Store({
+import Store from '@anew/store'
+
+const store = new Store({
     state: Any,
     reducers: Object,
     actions: Object,
