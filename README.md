@@ -27,9 +27,10 @@ const store = new Store({
     actions: Object,
     getters: Object,
     selectors: Object,
-    enhance: Object,
     modules: Object,
     listeners: Object,
+    plugins: Array,
+    enhance: Object,
 })
 ```
 
@@ -240,6 +241,32 @@ const store = new Store({
             },
         },
     },
+})
+```
+
+`plugins`: Extend a stores functionality
+
+```js
+// Creation
+const store = new Store({
+    // ...other store props
+    plugins: [
+        // Logger Plugin
+        store => {
+            if (process.env.NODE_ENV !== 'production') {
+                let prevState = {}
+
+                // Logs action/reducer when store is triggered
+                store.subscribe((action, args) => {
+                    console.group(action)
+                    console.log(`args:`, args)
+                    console.log(`before:`, prevState)
+                    console.log(`after:`, (prevState = JSON.parse(JSON.stringify(store.get()))))
+                    console.groupEnd(action)
+                })
+            }
+        },
+    ],
 })
 ```
 
