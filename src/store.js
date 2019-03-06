@@ -192,7 +192,8 @@ export default class Store {
                     storage[reducerName] = (...args) => {
                         const state = getState()
                         const change = reducer(state, ...args)
-                        this._stateHasChanged = change !== undefined && change !== state
+                        this._stateHasChanged =
+                            this._stateHasChanged || (change !== undefined && change !== state)
 
                         if (this._stateHasChanged) {
                             propagate(change)
