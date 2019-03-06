@@ -2,6 +2,10 @@
 
 > A lightweight robust predictable state container
 
+## Updates
+
+For updates checkout [Change Log](https://github.com/anewjs/store/blob/master/CHANGELOG.md).
+
 ## Installation
 
 To install `anew` directly into your project run:
