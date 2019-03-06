@@ -1,7 +1,6 @@
 import { createSelector } from 'reselect'
 
 import isPlainObject from './isPlainObject'
-import assert from './assert'
 
 export default class Store {
     constructor(options) {
