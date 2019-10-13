@@ -281,6 +281,7 @@ export default class Store {
                             get: store.get[actionName],
                             dispatch: store.dispatch[actionName],
                             commit: store.commit[actionName],
+                            api: store.api[actionName],
                             core: this,
                         },
                         path + '/'
