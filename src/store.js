@@ -27,6 +27,7 @@ export default class Store {
             selectors = this.selectors || {},
             listeners = this.listeners || {},
             enhance = this.enhance || {},
+            api = this.api || {},
             modules = this.modules,
         } = options
 
@@ -45,6 +46,7 @@ export default class Store {
         this.selectors = selectors
         this.listeners = listeners
         this.enhance = enhance
+        this.api = api
         this.modules = modules
 
         // Initialize Store

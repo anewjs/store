@@ -50,27 +50,27 @@
         "reselect": "^4.0.0"
     },
     "devDependencies": {
-        "@babel/cli": "^7.6.0",
-        "@babel/core": "^7.6.0",
-        "@babel/node": "^7.6.1",
+        "@babel/cli": "^7.6.4",
+        "@babel/core": "^7.6.4",
+        "@babel/node": "^7.6.3",
         "@babel/plugin-external-helpers": "^7.0.0",
         "@babel/plugin-proposal-class-properties": "^7.5.5",
-        "@babel/plugin-proposal-object-rest-spread": "^7.5.5",
-        "@babel/preset-env": "^7.6.0",
+        "@babel/plugin-proposal-object-rest-spread": "^7.6.2",
+        "@babel/preset-env": "^7.6.3",
         "@babel/preset-flow": "^7.0.0",
-        "@babel/register": "^7.6.0",
+        "@babel/register": "^7.6.2",
         "babel-core": "^7.0.0-bridge.0",
         "babel-eslint": "^10.0.3",
         "babel-jest": "^24.9.0",
-        "eslint": "6.4.0",
-        "husky": "^3.0.5",
+        "eslint": "6.5.1",
+        "husky": "^3.0.9",
         "jest": "^24.9.0",
-        "lint-staged": "^9.2.5",
+        "lint-staged": "^9.4.2",
         "prettier": "^1.18.2",
         "rxjs": "^6.5.3",
         "storage-memory": "^0.0.2",
         "symbol-observable": "^1.2.0",
         "vm": "^0.1.0",
-        "webpack": "^4.40.2"
+        "webpack": "^4.41.1"
     }
 }
