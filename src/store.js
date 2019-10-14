@@ -304,6 +304,7 @@ export default class Store {
                 get: store.get[contextName] || {},
                 dispatch: store.dispatch[contextName] || {},
                 commit: store.commit[contextName] || {},
+                api: store.api[contextName] || {},
                 core: this,
             }
 
