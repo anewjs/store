@@ -1,6 +1,8 @@
 import { createSelector } from 'reselect'
 
 import isPlainObject from './isPlainObject'
+import isPureFunction from './isPureFunction'
+import isClass from './isClass'
 
 export default class Store {
     constructor(options) {
@@ -46,7 +48,7 @@ export default class Store {
         this.selectors = selectors
         this.listeners = listeners
         this.enhance = enhance
-        this.api = api
+        this.api = { ...api }
         this.modules = modules
 
         // Initialize Store
@@ -62,6 +64,7 @@ export default class Store {
         })
         this._installReducers(reducers, this.commit, this.state, this.get)
         this._installActions(actions, this.dispatch, this)
+        this._installApi(api, this.api, this)
         this._installListeners(this.listeners, this._listeners, this.state, this)
 
         // Extend Commit Functionality
@@ -287,6 +290,37 @@ export default class Store {
                         path + '/'
                     )
                     break
+            }
+        })
+    }
+
+    _installApi(apis, storage, store) {
+        Object.entries(apis).forEach(([apiName, api]) => {
+            if (isClass(api) || apiName === 'context') {
+                try {
+                    storage[apiName] = api
+                } catch (e) {}
+                return
+            }
+            if (isPureFunction(api)) {
+                storage[apiName] = (...args) => {
+                    if (storage[apiName].beforeRequest) storage[apiName].beforeRequest(store)
+                    const result = api(store, ...args)
+                    if (storage[apiName].afterRequest) storage[apiName].afterRequest(store)
+                    return result
+                }
+                return
+            }
+            if (isPlainObject(api)) {
+                storage[apiName] = {}
+                this._installApi(api, storage[apiName], {
+                    select: store.select[apiName] || {},
+                    get: store.get[apiName] || {},
+                    dispatch: store.dispatch[apiName] || {},
+                    commit: store.commit[apiName] || {},
+                    api: store.api[apiName] || {},
+                    core: this,
+                })
             }
         })
     }
