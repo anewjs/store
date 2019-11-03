@@ -48,14 +48,15 @@ export default class Store {
         this.selectors = selectors
         this.listeners = listeners
         this.enhance = enhance
-        this.api = { ...api }
         this.modules = modules
+        this.api = { ...api }
 
         // Initialize Store
         this._initStore()
 
         // Install Options (From, To, ..args)
         this._installModules(modules, this)
+        this._installApi(this.api, this.api, this)
         this._installGetters(getters, this.get)
         this._installSelectors(selectors, this.select, {
             get: this.get,
@@ -64,7 +65,6 @@ export default class Store {
         })
         this._installReducers(reducers, this.commit, this.state, this.get)
         this._installActions(actions, this.dispatch, this)
-        this._installApi(api, this.api, this)
         this._installListeners(this.listeners, this._listeners, this.state, this)
 
         // Extend Commit Functionality
@@ -321,6 +321,10 @@ export default class Store {
                     api: store.api[apiName] || {},
                     core: this,
                 })
+            } else {
+                try {
+                    storage[apiName] = api
+                } catch (e) {}
             }
         })
     }
