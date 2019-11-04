@@ -2,6 +2,10 @@
 
 > A lightweight robust predictable state container
 
+<p align="center">
+  <img width="700px" src="https://raw.githubusercontent.com/anewjs/store/master/diagram.png">
+</p>
+
 ## Updates
 
 For updates checkout [Change Log](https://github.com/anewjs/store/blob/master/CHANGELOG.md).
