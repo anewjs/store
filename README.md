@@ -256,7 +256,7 @@ const store = new Store({
 // Ex. Using firestore
 const store = new Store({
     api: {
-        collection: firestore.collection('users')
+        collection: firestore.collection('users'),
         
         /**
          * @param {Object} store the entire @anew/store
