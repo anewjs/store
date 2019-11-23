@@ -367,13 +367,17 @@ export default class Store {
                 } catch (e) {}
                 return
             }
+            if (['beforeRequest', 'afterRequest'].includes(apiName)) {
+                storage[apiName] = (...args: any[]) => api(store, ...args)
+                return
+            }
             if (isPureFunction(api)) {
-                storage[apiName] = (...args: any[]) => {
-                    if (storage[apiName].beforeRequest)
-                        storage[apiName].beforeRequest(store, path, args)
-                    const result = api(store, ...args)
-                    if (storage[apiName].afterRequest)
-                        storage[apiName].afterRequest(store, path, args)
+                storage[apiName] = async (...args: any[]) => {
+                    if (typeof store.api.beforeRequest === 'function')
+                        store.api.beforeRequest(path, args)
+                    const result = await api(store, ...args)
+                    if (typeof store.api.afterRequest === 'function')
+                        store.api.afterRequest(path, result)
                     return result
                 }
                 return
