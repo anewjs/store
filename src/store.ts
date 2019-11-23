@@ -372,12 +372,21 @@ export default class Store {
                 return
             }
             if (isPureFunction(api)) {
-                storage[apiName] = async (...args: any[]) => {
-                    if (typeof store.api.beforeRequest === 'function')
+                storage[apiName] = (...args: any[]) => {
+                    if (typeof store.api.beforeRequest === 'function') {
                         store.api.beforeRequest(path, args)
-                    const result = await api(store, ...args)
-                    if (typeof store.api.afterRequest === 'function')
-                        store.api.afterRequest(path, result)
+                    }
+
+                    const result = api(store, ...args)
+
+                    if (typeof store.api.afterRequest === 'function') {
+                        if (result instanceof Promise) {
+                            result.then(result => store.api.afterRequest(path, result))
+                        } else {
+                            store.api.afterRequest(path, result)
+                        }
+                    }
+
                     return result
                 }
                 return
