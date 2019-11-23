@@ -1,18 +1,82 @@
 import { createSelector } from 'reselect'
 
-import CALL_TYPES from './callTypes'
+import { CallType, ObjectWithProps, FunctionWithProps } from './types'
 import isPlainObject from './isPlainObject'
 import isPureFunction from './isPureFunction'
 import isClass from './isClass'
 
+interface Options extends ObjectWithProps {
+    state?: State
+    plugins?: Array<Function>
+    reducers?: ObjectWithProps
+    actions?: ObjectWithProps
+    getters?: ObjectWithProps
+    selectors?: ObjectWithProps
+    listeners?: ObjectWithProps
+    enhance?: ObjectWithProps
+    api?: ObjectWithProps
+    modules?: ObjectWithProps
+}
+
+type StoreArg = {
+    select: FunctionWithProps
+    get: FunctionWithProps
+    dispatch: FunctionWithProps
+    commit: FunctionWithProps
+    api: ObjectWithProps
+    core?: Store
+}
+
+type SelectorStoreArg = {
+    select: FunctionWithProps
+    get: FunctionWithProps
+    prop: Function
+    core?: Store
+}
+
+type State = ObjectWithProps | number | string | any
+
+type Selector = (store: SelectorStoreArg) => Array<Function>
+
+const defaultOptions: Options = {
+    plugins: [],
+    state: {},
+    reducers: {},
+    actions: {},
+    getters: {},
+    selectors: {},
+    listeners: {},
+    enhance: {},
+    api: {},
+    modules: {},
+}
+
 export default class Store {
-    constructor(options) {
+    _subscriptions: Array<Function> = []
+    _nextSubscriptions: Array<Function> = []
+    _listeners: ObjectWithProps = {}
+    _stateHasChanged: boolean = false
+
+    state: ObjectWithProps = {}
+    reducers: ObjectWithProps = {}
+    actions: ObjectWithProps = {}
+    getters: ObjectWithProps = {}
+    selectors: ObjectWithProps = {}
+    listeners: ObjectWithProps = {}
+    enhance: ObjectWithProps = {}
+    api: ObjectWithProps = {}
+    modules: ObjectWithProps = {}
+
+    select: FunctionWithProps = () => {}
+    isStaging: boolean = false
+
+    constructor(options: Options) {
         if (options) {
             this.use(options)
         }
     }
 
-    use({ plugins = [], ...options } = {}) {
+    use({ plugins = [], ...options }: Options = defaultOptions) {
         // Initialize Listeners
         this._subscriptions = []
         this._nextSubscriptions = this._subscriptions
@@ -23,14 +87,14 @@ export default class Store {
         this._installPlugins(plugins, options)
 
         const {
-            state = this.state || {},
-            reducers = this.reducers || {},
-            actions = this.actions || {},
-            getters = this.getters || {},
-            selectors = this.selectors || {},
-            listeners = this.listeners || {},
-            enhance = this.enhance || {},
-            api = this.api || {},
+            state = this.state || defaultOptions.state,
+            reducers = this.reducers || defaultOptions.reducers,
+            actions = this.actions || defaultOptions.actions,
+            getters = this.getters || defaultOptions.getters,
+            selectors = this.selectors || defaultOptions.selectors,
+            listeners = this.listeners || defaultOptions.listeners,
+            enhance = this.enhance || defaultOptions.enhance,
+            api = this.api || defaultOptions.api,
             modules = this.modules,
         } = options
 
@@ -52,9 +116,6 @@ export default class Store {
         this.modules = modules
         this.api = { ...api }
 
-        // Initialize Store
-        this._initStore()
-
         // Install Options (From, To, ..args)
         this._installModules(modules, this)
         this._installApi(this.api, this.api, this)
@@ -72,12 +133,12 @@ export default class Store {
         this._extendCommit()
     }
 
-    _installPlugins(plugins, options) {
+    _installPlugins(plugins: Array<Function>, options: Options) {
         if (plugins.length) {
             const param = {
                 get: () => options,
-                inject: updates => {
-                    Object.entries(updates).forEach(([updateType, update]) => {
+                inject: (updates: Object) => {
+                    Object.entries(updates).forEach(([updateType, update]: [string, Object]) => {
                         options[updateType] = Object.assign(options[updateType] || {}, update)
                     })
                 },
@@ -87,12 +148,8 @@ export default class Store {
         }
     }
 
-    _initStore() {
-        this.select = {}
-    }
-
-    _installModules(modules = {}, storage) {
-        Object.entries(modules).forEach(([moduleName, module]) => {
+    _installModules(modules: Object = {}, storage: ObjectWithProps) {
+        Object.entries(modules).forEach(([moduleName, module]: [string, Options]) => {
             if (module.state === undefined) module.state = {}
             if (!module.getters) module.getters = {}
             if (!module.reducers) module.reducers = {}
@@ -132,11 +189,11 @@ export default class Store {
         })
     }
 
-    _installGetters(getters, getState) {
+    _installGetters(getters: Object, getState: FunctionWithProps) {
         Object.entries(getters).forEach(([getName, get]) => {
             switch (typeof get) {
                 case 'function':
-                    getState[getName] = (...args) => get(getState(), ...args)
+                    getState[getName] = (...args: any[]) => get(getState(), ...args)
                     break
                 case 'object':
                     getState[getName] = () => getState()[getName]
@@ -146,14 +203,14 @@ export default class Store {
         })
     }
 
-    _installSelectors(selectors, storage, store) {
-        Object.entries(selectors).forEach(([selectorName, selector]) => {
+    _installSelectors(selectors: Object, storage: ObjectWithProps, store: SelectorStoreArg) {
+        Object.entries(selectors).forEach(([selectorName, selector]: [string, Selector]) => {
             switch (typeof selector) {
                 case 'function':
-                    const memoizedSelector = createSelector(...selector(store))
+                    const memoizedSelector = (createSelector as any)(...selector(store))
 
-                    storage[selectorName] = (props = {}, args = {}) => {
-                        const state = store.get()
+                    storage[selectorName] = (props: Object = {}, args: Object = {}) => {
+                        const state: Object = store.get()
 
                         return memoizedSelector(state, state === props ? args : props)
                     }
@@ -173,14 +230,14 @@ export default class Store {
     }
 
     _installReducers(
-        reducers,
-        storage,
-        stateRef,
-        getState,
-        prefix = '',
-        propagate = typeof stateRef !== 'object'
-            ? change => (this.state = change)
-            : (change, containerName) => {
+        reducers: Object,
+        storage: ObjectWithProps,
+        stateRef: ObjectWithProps,
+        getState: FunctionWithProps,
+        prefix: string = '',
+        propagate: Function = typeof stateRef !== 'object'
+            ? (change: Object) => (this.state = change)
+            : (change: Object, containerName: string) => {
                   this.state = Object.assign(
                       {},
                       this.state,
@@ -195,7 +252,7 @@ export default class Store {
 
             switch (typeof reducer) {
                 case 'function':
-                    storage[reducerName] = (...args) => {
+                    storage[reducerName] = (...args: any[]) => {
                         const state = getState()
                         const change = reducer(state, ...args)
                         this._stateHasChanged =
@@ -212,7 +269,7 @@ export default class Store {
                     }
                     break
                 case 'object':
-                    storage[reducerName] = (target, ...args) =>
+                    storage[reducerName] = (target: string, ...args: any[]) =>
                         this.commit(path + (target ? `/${target}` : ''), ...args)
                     storage[reducerName].stage = this._stage
 
@@ -221,8 +278,8 @@ export default class Store {
                     const objectInstance = isPlainObject(targetState) ? {} : []
                     const nextPropogation =
                         targetState && typeof targetState !== 'object'
-                            ? change => propagate({ [reducerName]: change })
-                            : (change, containerName) => {
+                            ? (change: any) => propagate({ [reducerName]: change })
+                            : (change: any, containerName: string) => {
                                   return propagate(
                                       Object.assign(
                                           objectInstance,
@@ -246,7 +303,12 @@ export default class Store {
         })
     }
 
-    _installActions(actions, storage, store, prefix = '') {
+    _installActions(
+        actions: Object,
+        storage: ObjectWithProps,
+        store: StoreArg,
+        prefix: string = ''
+    ) {
         const enhanceActions = this.enhance.actions
 
         Object.entries(actions).forEach(([actionName, action]) => {
@@ -255,7 +317,7 @@ export default class Store {
             switch (typeof action) {
                 case 'function':
                     if (enhanceActions) {
-                        storage[actionName] = (...args) => {
+                        storage[actionName] = (...args: any[]) => {
                             this._stage()
                             const result = action(store, ...args)
 
@@ -263,14 +325,14 @@ export default class Store {
                                 store.commit.push(result)
                             }
 
-                            this._stagePush(path, args, CALL_TYPES.ACTION)
+                            this._stagePush(path, args, CallType.ACTION)
                             return result
                         }
                     } else {
-                        storage[actionName] = (...args) => {
+                        storage[actionName] = (...args: any[]) => {
                             this._stage()
                             const result = action(store, ...args)
-                            this._stagePush(path, args, CALL_TYPES.ACTION)
+                            this._stagePush(path, args, CallType.ACTION)
                             return result
                         }
                     }
@@ -295,7 +357,7 @@ export default class Store {
         })
     }
 
-    _installApi(apis, storage, store, prefix = '') {
+    _installApi(apis: Object, storage: ObjectWithProps, store: StoreArg, prefix: string = '') {
         Object.entries(apis).forEach(([apiName, api]) => {
             const path = prefix + apiName
 
@@ -306,7 +368,7 @@ export default class Store {
                 return
             }
             if (isPureFunction(api)) {
-                storage[apiName] = (...args) => {
+                storage[apiName] = (...args: any[]) => {
                     if (storage[apiName].beforeRequest) storage[apiName].beforeRequest(store, path)
                     const result = api(store, ...args)
                     if (storage[apiName].afterRequest) storage[apiName].afterRequest(store, path)
@@ -337,15 +399,21 @@ export default class Store {
         })
     }
 
-    _installListeners(listeners, storage, state, store, prefix = '') {
+    _installListeners(
+        listeners: ObjectWithProps,
+        storage: ObjectWithProps,
+        state: State,
+        store: StoreArg,
+        prefix: string = ''
+    ) {
         const listenerKeys = Object.keys(listeners)
 
         for (let i = 0, listenersLen = listenerKeys.length; i < listenersLen; i++) {
             const contextName = listenerKeys[i]
-            const context = listeners[contextName]
+            const context: ObjectWithProps = listeners[contextName]
 
             const contextKeys = Object.keys(context)
-            const contextStore = {
+            const contextStore: StoreArg = {
                 select: store.select[contextName] || {},
                 get: store.get[contextName] || {},
                 dispatch: store.dispatch[contextName] || {},
@@ -374,7 +442,7 @@ export default class Store {
                             const prevListenerBinded = prevListener && prevListener.bind({})
 
                             if (prevListenerBinded) {
-                                storage[path] = (targetState, ...args) => {
+                                storage[path] = (targetState: Object, ...args: any[]) => {
                                     prevListenerBinded(targetState, ...args)
                                     this._stage()
                                     const result = reducer(contextStore, targetState, ...args)
@@ -386,7 +454,7 @@ export default class Store {
                                     this._stagePush(listenerPath, args)
                                 }
                             } else {
-                                storage[path] = (targetState, ...args) => {
+                                storage[path] = (targetState: Object, ...args: any[]) => {
                                     this._stage()
                                     const result = reducer(contextStore, targetState, ...args)
 
@@ -427,7 +495,7 @@ export default class Store {
     |
     */
 
-    subscribe = listener => {
+    subscribe = (listener: Function) => {
         if (typeof listener !== 'function') {
             throw new Error('Expected the listener to be a function.')
         }
@@ -452,17 +520,17 @@ export default class Store {
         return unsubscribe
     }
 
-    get = () => {
+    get: FunctionWithProps = () => {
         return this.state
     }
 
-    dispatch = (actionPath, ...args) => {
+    dispatch: FunctionWithProps = (actionPath: string, ...args: any[]) => {
         const actionPaths = actionPath.split('/')
         const lastActionIndex = actionPaths.length - 1
 
-        return actionPaths.reduce((actionParent, path, i) => {
+        return actionPaths.reduce((actionParent: FunctionWithProps, path: string, i: number) => {
             if (i === lastActionIndex) {
-                const action = actionParent[path]
+                const action: Function = actionParent[path]
 
                 return typeof action === 'function' && action(...args)
             }
@@ -471,13 +539,13 @@ export default class Store {
         }, this.dispatch)
     }
 
-    commit = (reducerPath, ...args) => {
+    commit: FunctionWithProps = (reducerPath: string, ...args: any[]) => {
         const reducerPaths = reducerPath.split('/')
         const lastReducerIndex = reducerPaths.length - 1
 
-        return reducerPaths.reduce((reducerParent, path, i) => {
+        return reducerPaths.reduce((reducerParent: FunctionWithProps, path: string, i: number) => {
             if (i === lastReducerIndex) {
-                const reducer = reducerParent[path]
+                const reducer: Function = reducerParent[path]
 
                 return typeof reducer === 'function' && reducer(...args)
             }
@@ -493,28 +561,32 @@ export default class Store {
      |
      */
 
-    _push = (state, change) => {
+    private _push = (state: Object, change: Function | Object) => {
         return typeof change === 'function' ? change(state) : change
     }
 
-    _stage = () => {
+    private _stage: FunctionWithProps = () => {
         this.isStaging = true
     }
 
-    _stagePush = (path, args, callType = CALL_TYPES.REDUCER) => {
+    private _stagePush = (path: string, args: any[], callType: CallType = CallType.REDUCER) => {
         if (this.isStaging) {
             this.isStaging = false
             this._notifiySubscriptions(path, args, callType)
         }
     }
 
-    _ensureCanMutateNextListeners = () => {
+    private _ensureCanMutateNextListeners = () => {
         if (this._nextSubscriptions === this._subscriptions) {
             this._nextSubscriptions = this._subscriptions.slice()
         }
     }
 
-    _notifiySubscriptions = (path, args, callType) => {
+    private _notifiySubscriptions = (
+        path: string,
+        args: any[],
+        callType: CallType = CallType.REDUCER
+    ) => {
         if (!this.isStaging && this._stateHasChanged) {
             this._stateHasChanged = false
             const listeners = (this._subscriptions = this._nextSubscriptions)
@@ -523,15 +595,15 @@ export default class Store {
         }
     }
 
-    _notifiyListeners = (path, state, ...args) => {
-        const listener = this._listeners[path]
+    private _notifiyListeners = (path: string, state: object, ...args: any[]) => {
+        const listener: Function = this._listeners[path]
 
         if (listener) {
             listener(state, ...args)
         }
     }
 
-    _prop = (propName, defaultValue) => {
-        return (s, { [propName]: propValue = defaultValue } = {}) => propValue
+    private _prop = (propName: string, defaultValue: any) => {
+        return (_: any, { [propName]: propValue = defaultValue }: ObjectWithProps = {}) => propValue
     }
 }

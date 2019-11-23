@@ -1,4 +1,4 @@
-import Store from '../src/store'
+import Store from '..'
 import counterStore from './stores/counter'
 
 describe('new Store', () => {

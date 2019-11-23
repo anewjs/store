@@ -1,4 +1,4 @@
-export default function isClass(cls) {
+export default function isClass(cls: any): boolean {
     return (
         (typeof cls === 'function' &&
             /classCallCheck/.test(Function.prototype.toString.call(cls))) ||
