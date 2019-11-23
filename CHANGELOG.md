@@ -3,7 +3,8 @@
 This project adheres to [Semantic Versioning](http://semver.org/).
 
 ## v2.4.0 (2019-11-04)
-- Introducing the new API component within the store architecture. Check out the README for details.
+
+-   Introducing the new API component within the store architecture. Check out the README for details.
 
 ## v2.2.1 (2019-03-06)
 

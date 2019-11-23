@@ -44,18 +44,18 @@
         "format:check": "prettier --list-different \"{src,test}/**/*.{js,ts}\" index.d.ts \"**/*.md\"",
         "lint": "eslint --ext js,ts src test",
         "check-types": "tsc --noEmit",
-        "pretest": "yarn build",
+        "pretest": "yarn run build",
         "test": "jest",
-        "test:watch": "yarn test -- --watch",
-        "test:cov": "yarn test -- --coverage",
+        "test:watch": "yarn run test -- --watch",
+        "test:cov": "yarn run test -- --coverage",
         "build": "rollup -c",
-        "prepare": "yarn clean && yarn check-types && yarn format:check && yarn lint && yarn test",
+        "prepare": "yarn run clean && yarn run check-types && yarn run format:check && yarn run lint && yarn run test",
         "examples:lint": "eslint --ext js,ts examples",
         "examples:test": "cross-env CI=true babel-node examples/testAll.js"
     },
     "dependencies": {
-        "reselect": "^4.0.0",
         "loose-envify": "^1.4.0",
+        "reselect": "^4.0.0",
         "symbol-observable": "^1.2.0"
     },
     "devDependencies": {
@@ -83,6 +83,7 @@
         "eslint-plugin-react": "^7.14.3",
         "eslint-plugin-react-hooks": "^1.7.0",
         "glob": "^7.1.4",
+        "husky": "^3.1.0",
         "jest": "^24.9.0",
         "prettier": "^1.18.2",
         "rimraf": "^3.0.0",

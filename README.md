@@ -253,7 +253,6 @@ const store = new Store({
 })
 ```
 
-
 `api`: manage your application program interface (API) using the power @anew/store brings.
 
 ```js
@@ -261,14 +260,14 @@ const store = new Store({
 const store = new Store({
     api: {
         collection: firestore.collection('users'),
-        
+
         /**
          * @param {Object} store the entire @anew/store
          **/
         getUsersByCompany(store, company) {
-            return store.api.collection.where("company", "==", company)
+            return store.api.collection.where('company', '==', company)
         },
-        
+
         async deleteUser(store, id) {
             await store.api.collection.doc(id).delete()
             // Access to other store api
