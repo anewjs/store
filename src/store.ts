@@ -369,9 +369,11 @@ export default class Store {
             }
             if (isPureFunction(api)) {
                 storage[apiName] = (...args: any[]) => {
-                    if (storage[apiName].beforeRequest) storage[apiName].beforeRequest(store, path)
+                    if (storage[apiName].beforeRequest)
+                        storage[apiName].beforeRequest(store, path, args)
                     const result = api(store, ...args)
-                    if (storage[apiName].afterRequest) storage[apiName].afterRequest(store, path)
+                    if (storage[apiName].afterRequest)
+                        storage[apiName].afterRequest(store, path, args)
                     return result
                 }
                 return
