@@ -1,5 +1,6 @@
 import { createSelector } from 'reselect'
 
+import CALL_TYPES from './callTypes'
 import isPlainObject from './isPlainObject'
 import isPureFunction from './isPureFunction'
 import isClass from './isClass'
@@ -262,14 +263,14 @@ export default class Store {
                                 store.commit.push(result)
                             }
 
-                            this._stagePush(path + '+', args)
+                            this._stagePush(path, args, CALL_TYPES.ACTION)
                             return result
                         }
                     } else {
                         storage[actionName] = (...args) => {
                             this._stage()
                             const result = action(store, ...args)
-                            this._stagePush(path + '+', args)
+                            this._stagePush(path, args, CALL_TYPES.ACTION)
                             return result
                         }
                     }
@@ -294,8 +295,10 @@ export default class Store {
         })
     }
 
-    _installApi(apis, storage, store) {
+    _installApi(apis, storage, store, prefix = '') {
         Object.entries(apis).forEach(([apiName, api]) => {
+            const path = prefix + apiName
+
             if (isClass(api) || apiName === 'context') {
                 try {
                     storage[apiName] = api
@@ -304,23 +307,28 @@ export default class Store {
             }
             if (isPureFunction(api)) {
                 storage[apiName] = (...args) => {
-                    if (storage[apiName].beforeRequest) storage[apiName].beforeRequest(store)
+                    if (storage[apiName].beforeRequest) storage[apiName].beforeRequest(store, path)
                     const result = api(store, ...args)
-                    if (storage[apiName].afterRequest) storage[apiName].afterRequest(store)
+                    if (storage[apiName].afterRequest) storage[apiName].afterRequest(store, path)
                     return result
                 }
                 return
             }
             if (isPlainObject(api)) {
                 storage[apiName] = {}
-                this._installApi(api, storage[apiName], {
-                    select: store.select[apiName] || {},
-                    get: store.get[apiName] || {},
-                    dispatch: store.dispatch[apiName] || {},
-                    commit: store.commit[apiName] || {},
-                    api: store.api[apiName] || {},
-                    core: this,
-                })
+                this._installApi(
+                    api,
+                    storage[apiName],
+                    {
+                        select: store.select[apiName] || {},
+                        get: store.get[apiName] || {},
+                        dispatch: store.dispatch[apiName] || {},
+                        commit: store.commit[apiName] || {},
+                        api: store.api[apiName] || {},
+                        core: this,
+                    },
+                    path + '/'
+                )
             } else {
                 try {
                     storage[apiName] = api
@@ -493,10 +501,10 @@ export default class Store {
         this.isStaging = true
     }
 
-    _stagePush = (path, args) => {
+    _stagePush = (path, args, callType = CALL_TYPES.REDUCER) => {
         if (this.isStaging) {
             this.isStaging = false
-            this._notifiySubscriptions(path, args)
+            this._notifiySubscriptions(path, args, callType)
         }
     }
 
@@ -506,12 +514,12 @@ export default class Store {
         }
     }
 
-    _notifiySubscriptions = (path, args) => {
+    _notifiySubscriptions = (path, args, callType) => {
         if (!this.isStaging && this._stateHasChanged) {
             this._stateHasChanged = false
             const listeners = (this._subscriptions = this._nextSubscriptions)
 
-            listeners.forEach(listener => listener(path, args))
+            listeners.forEach(listener => listener(path, args, callType))
         }
     }
 
