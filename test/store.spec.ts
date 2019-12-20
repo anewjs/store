@@ -31,7 +31,7 @@ describe('new Store', () => {
 
         store.use({
             getters: {
-                double(state) {
+                double(state: number) {
                     return state * 2
                 },
             },
@@ -97,7 +97,7 @@ describe('new Store', () => {
                     return state
                 },
 
-                inc(state) {
+                inc(state: { count: number }) {
                     return {
                         count: state.count + 1,
                     }
@@ -210,14 +210,14 @@ describe('new Store', () => {
 
                     listeners: {
                         counter: {
-                            inc(store, state, arg) {
+                            inc(context, arg) {
                                 mockListener()
 
-                                expect(store.get()).toEqual({
+                                expect(context.store.get()).toEqual({
                                     someState: null,
                                 })
 
-                                expect(state).toEqual({
+                                expect(context.state).toEqual({
                                     count: 1,
                                 })
 

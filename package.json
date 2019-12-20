@@ -54,9 +54,11 @@
         "examples:test": "cross-env CI=true babel-node examples/testAll.js"
     },
     "dependencies": {
+        "is-plain-object": "^3.0.0",
         "loose-envify": "^1.4.0",
         "reselect": "^4.0.0",
-        "symbol-observable": "^1.2.0"
+        "symbol-observable": "^1.2.0",
+        "type-guards": "^0.12.1"
     },
     "devDependencies": {
         "@babel/cli": "^7.6.0",
