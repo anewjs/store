@@ -34,6 +34,7 @@ import {
     ListenerContext,
     Select,
     Subscription,
+    ObjectOf,
 } from './types'
 
 export default class Store implements StoreInterface {
@@ -99,7 +100,9 @@ export default class Store implements StoreInterface {
                 get: () => options,
                 inject: updates => {
                     Object.keys(updates).forEach(updateType => {
-                        Object.assign(options[updateType] || {}, updates[updateType])
+                        const updateKey = <keyof StoreOptions>updateType
+
+                        Object.assign(options[updateKey] || {}, updates[updateKey])
                     })
                 },
             }
@@ -122,16 +125,18 @@ export default class Store implements StoreInterface {
                     case 'state':
                         moduleOptions.state = cleanState(moduleOptions.state)
                     default:
+                        const key = <keyof StoreOptions>type
+
                         if (!storage[type]) storage[type] = {}
 
                         if (storage[type][moduleName]) {
                             storage[type][moduleName] = Object.assign(
                                 {},
-                                moduleOptions[type],
+                                moduleOptions[key],
                                 storage[type][moduleName]
                             )
                         } else {
-                            storage[type][moduleName] = moduleOptions[type]
+                            storage[type][moduleName] = moduleOptions[key]
                         }
 
                         break
@@ -156,7 +161,7 @@ export default class Store implements StoreInterface {
                         const state = getState()
 
                         if (isObject(state)) {
-                            return state[getName]
+                            return state[getName as keyof State]
                         }
 
                         return state
@@ -245,7 +250,7 @@ export default class Store implements StoreInterface {
                     storage[reducerName].stage = this.stage
 
                     const targetGetState = getState[reducerName] as Get
-                    const targetState = isObject(stateRef) && stateRef[reducerName]
+                    const targetState = isObject(stateRef) && stateRef[reducerName as keyof State]
                     const isTargetStateObject = isObject(targetState)
                     const objectInstance = isTargetStateObject ? {} : []
                     const nextPropogation = isTargetStateObject
@@ -344,10 +349,10 @@ export default class Store implements StoreInterface {
                 return
             }
             if (['beforeRequest', 'afterRequest'].includes(apiName as string)) {
-                storage[apiName] = (...args: any[]) => (api as Function)(store, ...args)
+                storage[apiName] = (...args: any[]) => (api as any)(store, ...args)
                 return
             }
-            if (isFunction<Api>(api)) {
+            if (isFunction(api)) {
                 storage[apiName] = (...args: any[]) => {
                     if (isFunction(store.api.beforeRequest)) {
                         ;(store.api.beforeRequest as Function)(path, args)
@@ -397,7 +402,7 @@ export default class Store implements StoreInterface {
 
         for (let i = 0, listenersLen = listenerKeys.length; i < listenersLen; i++) {
             const contextName = listenerKeys[i]
-            const context = listeners[contextName]
+            const context = listeners[contextName] as ObjectOf<Listeners>
 
             const contextKeys = Object.keys(context)
             const contextStore: ListenerContext = {
@@ -467,7 +472,7 @@ export default class Store implements StoreInterface {
                             this.installListeners(
                                 context as Listeners,
                                 storage,
-                                isObject(state) ? state[contextName] : state,
+                                isObject(state) ? state[contextName as keyof State] : state,
                                 contextStore,
                                 contextName + '/'
                             )
