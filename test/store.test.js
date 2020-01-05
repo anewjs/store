@@ -210,7 +210,7 @@ describe('new Store', () => {
 
                     listeners: {
                         counter: {
-                            inc(store, state, arg) {
+                            inc({ store, state }, arg) {
                                 mockListener()
 
                                 expect(store.get()).toEqual({
