@@ -363,12 +363,12 @@ export default class Store {
                 const targetKeys = Object.keys(target)
 
                 for (let k = 0, targetLen = targetKeys.length; k < targetLen; k++) {
-                    const reducerName = targetKeys[k]
-                    const reducer = target[reducerName]
+                    const listenerName = targetKeys[k]
+                    const listener = target[listenerName]
 
-                    switch (typeof reducer) {
+                    switch (typeof listener) {
                         case 'function':
-                            const path = `${prefix}${targetName}/${reducerName}`
+                            const path = `${prefix}${targetName}/${listenerName}`
                             const listenerPath = `${contextName}(${path})`
                             const prevListener = storage[path]
                             const prevListenerBinded = prevListener && prevListener.bind({})
@@ -377,7 +377,10 @@ export default class Store {
                                 storage[path] = (targetState, ...args) => {
                                     prevListenerBinded(targetState, ...args)
                                     this._stage()
-                                    const result = reducer(contextStore, targetState, ...args)
+                                    const result = listener(
+                                        { store: contextStore, state: targetState },
+                                        ...args
+                                    )
 
                                     if (result !== undefined) {
                                         contextStore.commit.push(result)
@@ -388,7 +391,10 @@ export default class Store {
                             } else {
                                 storage[path] = (targetState, ...args) => {
                                     this._stage()
-                                    const result = reducer(contextStore, targetState, ...args)
+                                    const result = listener(
+                                        { store: contextStore, state: targetState },
+                                        ...args
+                                    )
 
                                     if (result !== undefined) {
                                         contextStore.commit.push(result)
