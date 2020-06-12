@@ -59,11 +59,16 @@ export default class Store {
         this._installModules(modules, this)
         this._installApi(this.api, this.api, this)
         this._installGetters(getters, this.get)
-        this._installSelectors(selectors, this.select, {
-            get: this.get,
-            select: this.select,
-            prop: this._prop,
-        })
+        this._installSelectors(
+            selectors,
+            this.select,
+            {
+                get: this.get,
+                select: this.select,
+                prop: this._prop,
+            },
+            this.memoizedSelectors
+        )
         this._installReducers(reducers, this.commit, this.state, this.get)
         this._installActions(actions, this.dispatch, this)
         this._installListeners(this.listeners, this._listeners, this.state, this)
@@ -89,6 +94,7 @@ export default class Store {
 
     _initStore() {
         this.select = {}
+        this.memoizedSelectors = {}
     }
 
     _installModules(modules = {}, storage) {
@@ -133,10 +139,20 @@ export default class Store {
     }
 
     _installGetters(getters, getState) {
+        const enhanceGetters = this.enhance.getters
+
         Object.entries(getters).forEach(([getName, get]) => {
             switch (typeof get) {
                 case 'function':
-                    getState[getName] = (...args) => get(getState(), ...args)
+                    if (enhanceGetters) {
+                        getState[getName] = (...args) => {
+                            const result = get(getState(), ...args)
+
+                            return typeof result === 'function' ? result(this.get()) : result
+                        }
+                    } else {
+                        getState[getName] = (...args) => get(getState(), ...args)
+                    }
                     break
                 case 'object':
                     getState[getName] = () => getState()[getName]
@@ -146,27 +162,38 @@ export default class Store {
         })
     }
 
-    _installSelectors(selectors, storage, store) {
+    _installSelectors(selectors, storage, store, memoizedSelectors) {
         Object.entries(selectors).forEach(([selectorName, selector]) => {
             switch (typeof selector) {
                 case 'function':
-                    const memoizedSelector = createSelector(...selector(store))
-
                     storage[selectorName] = (props = {}, args = {}) => {
                         const state = store.get()
 
-                        return memoizedSelector(state, state === props ? args : props)
+                        if (!memoizedSelectors[selectorName]) {
+                            memoizedSelectors[selectorName] = createSelector(...selector(store))
+                        }
+
+                        return memoizedSelectors[selectorName](
+                            state,
+                            state === props ? args : props
+                        )
                     }
                     break
                 case 'object':
                     storage[selectorName] = {}
+                    memoizedSelectors[selectorName] = {}
 
-                    this._installSelectors(selector, storage[selectorName], {
-                        get: store.get[selectorName],
-                        select: store.select[selectorName],
-                        prop: this._prop,
-                        core: this,
-                    })
+                    this._installSelectors(
+                        selector,
+                        storage[selectorName],
+                        {
+                            get: store.get[selectorName],
+                            select: store.select[selectorName],
+                            prop: this._prop,
+                            core: this,
+                        },
+                        memoizedSelectors[selectorName]
+                    )
                     break
             }
         })
