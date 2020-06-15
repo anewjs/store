@@ -57,7 +57,6 @@ export default class Store {
 
         // Install Options (From, To, ..args)
         this._installModules(modules, this)
-        this._installApi(this.api, this.api, this)
         this._installGetters(getters, this.get)
         this._installSelectors(
             selectors,
@@ -69,8 +68,19 @@ export default class Store {
             },
             this.memoizedSelectors
         )
+        this._installApi(this.api, this.api, {
+            select: this.select,
+            get: this.get,
+            api: this.api,
+        })
         this._installReducers(reducers, this.commit, this.state, this.get)
-        this._installActions(actions, this.dispatch, this)
+        this._installActions(actions, this.dispatch, {
+            select: this.select,
+            get: this.get,
+            dispatch: this.dispatch,
+            commit: this.commit,
+            api: this.api,
+        })
         this._installListeners(this.listeners, this._listeners, this.state, this)
 
         // Extend Commit Functionality
@@ -349,8 +359,6 @@ export default class Store {
                     {
                         select: store.select[apiName] || {},
                         get: store.get[apiName] || {},
-                        dispatch: store.dispatch[apiName] || {},
-                        commit: store.commit[apiName] || {},
                         api: store.api[apiName] || {},
                         core: this,
                     },
