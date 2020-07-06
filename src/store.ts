@@ -23,40 +23,52 @@ export interface BaseGetters<State> {
   [getterName: string]: (state: State, ...args: any) => any
 }
 
+export interface BaseActions {
+  [actioName: string]: (...args: any) => any
+}
+
 export default class Store<
   State extends BaseState,
   Reducers extends BaseReducers<State>,
-  Getters extends BaseGetters<State>
+  Getters extends BaseGetters<State>,
+  Actions extends BaseActions
 > {
+  private isGroup: boolean = false
   private _collection?: StoreCollection<any>
   private _collectionKey?: string
   private _state: State
   private _initialState: State
   private _reducers: Reducers
+  private _actions?: Actions
   private _getters?: Getters
   private _subscriptions: Array<
     ({
+      action,
       reducer,
       args,
       stateChange,
     }: {
-      reducer: keyof Reducers
+      reducer?: keyof Reducers
+      action?: keyof Actions
       args: Array<any>
       stateChange: Readonly<Partial<State>>
     }) => any
   >
   private _nextSubscriptions: Array<
     ({
+      action,
       reducer,
       args,
       stateChange,
     }: {
-      reducer: keyof Reducers
+      reducer?: keyof Reducers
+      action?: keyof Actions
       args: Array<any>
       stateChange: Readonly<Partial<State>>
     }) => any
   >
 
+  public dispatch = {} as Actions
   public commit = {} as {
     [RKey in keyof Reducers]: (...args: Args<Reducers[RKey]>) => ReturnType<Reducers[RKey]>
   }
@@ -64,15 +76,17 @@ export default class Store<
     [GKey in keyof Getters]: (...args: Args<Getters[GKey]>) => ReturnType<Getters[GKey]>
   }
 
-  constructor(config: { state: State; reducers: Reducers; getters?: Getters }) {
+  constructor(config: { state: State; reducers: Reducers; getters?: Getters; actions?: Actions }) {
     this._state = config.state
     this._initialState = { ...config.state }
     this._reducers = config.reducers
     this._getters = config.getters
+    this._actions = config.actions
     this._subscriptions = []
     this._nextSubscriptions = this._subscriptions
     this.initCommit()
     this.initGet()
+    this.initDispatch()
   }
 
   // @ts-ignore
@@ -96,6 +110,19 @@ export default class Store<
     })
   }
 
+  private initDispatch() {
+    if (this._actions) {
+      Object.entries(this._actions).forEach(([actionKey, action]) => {
+        this.dispatch[actionKey as keyof Actions] = ((...args: any[]) => {
+          this.group()
+          const result = action(this._state, ...args)
+          this.groupEnd(actionKey, args)
+          return result
+        }) as any
+      })
+    }
+  }
+
   private initGet() {
     if (this._getters) {
       Object.entries(this._getters).forEach(([getterKey, getter]) => {
@@ -112,13 +139,24 @@ export default class Store<
     }
   }
 
-  private notifiySubscriptions(
-    reducer: keyof Reducers,
-    args: Array<any>,
-    stateChange: Readonly<Partial<State>>
-  ) {
-    const listeners = (this._subscriptions = this._nextSubscriptions)
-    listeners.forEach(listener => listener({ reducer, args, stateChange }))
+  private notifiySubscriptions({
+    action,
+    reducer,
+    args,
+    stateChange = this._state,
+  }: {
+    action?: keyof Actions
+    reducer?: keyof Reducers
+    args: any[]
+    stateChange?: Readonly<Partial<State>>
+  }) {
+    if (
+      !this.isGroup &&
+      ((this.collection && !(this.collection as any).isGroup) || !this.collection)
+    ) {
+      const listeners = (this._subscriptions = this._nextSubscriptions)
+      listeners.forEach(listener => listener({ action, reducer, args, stateChange }))
+    }
   }
 
   private ensureCanMutateNextListeners = () => {
@@ -130,10 +168,12 @@ export default class Store<
   public subscribe = (
     listener: ({
       reducer,
+      action,
       args,
       stateChange,
     }: {
-      reducer: keyof Reducers
+      reducer?: keyof Reducers
+      action?: keyof Actions
       args: Array<any>
       stateChange: Readonly<Partial<State>>
     }) => any
@@ -158,7 +198,7 @@ export default class Store<
 
   public setState(state: Partial<State>, reducerName: string = 'setState', args: any[] = []) {
     this.notifyCollection((this._state = { ...this._state, ...state }))
-    this.notifiySubscriptions(reducerName, args, state)
+    this.notifiySubscriptions({ reducer: reducerName, args, stateChange: state })
   }
 
   public resetState() {
@@ -177,6 +217,15 @@ export default class Store<
     if (!this._collection) throw new Error('Accessing undefined property `collection`')
     return this._collection
   }
+
+  public group() {
+    this.isGroup = true
+  }
+
+  public groupEnd(actionKey?: string, args: any[] = []) {
+    this.isGroup = false
+    this.notifiySubscriptions({ action: actionKey, args })
+  }
 }
 
 /**
@@ -186,10 +235,13 @@ export default class Store<
  */
 
 export interface BaseStores {
-  [storeName: string]: Store<any, any, any> | StoreCollection<BaseStores>
+  [storeName: string]: Store<any, any, any, any> | StoreCollection<BaseStores>
 }
 
 export class StoreCollection<Stores extends BaseStores> {
+  // @ts-ignore
+  private isGroup: boolean = false
+  private isGroupEnding: boolean = false
   private _collection?: StoreCollection<any>
   private _collectionKey?: string
   private _state = {} as {
@@ -245,18 +297,22 @@ export class StoreCollection<Stores extends BaseStores> {
     listener: ({
       storeName,
       reducer,
+      action,
       args,
       stateChange,
     }: {
       storeName: keyof Stores
-      reducer: string | number | symbol
+      reducer?: string | number | symbol
+      action?: string | number | symbol
       args: Array<any>
       stateChange: Readonly<BaseState>
     }) => any
   ) {
     const unsubscribes = Object.keys(this.stores).map(storeName => {
-      return this.getStore(storeName).subscribe(({ reducer, args, stateChange }) => {
-        return listener({ reducer, args, stateChange, storeName })
+      return this.getStore(storeName).subscribe(({ action, reducer, args, stateChange }) => {
+        if (!this.isGroupEnding && !this.isGroup) {
+          return listener({ action, reducer, args, stateChange, storeName })
+        }
       })
     })
 
@@ -284,5 +340,21 @@ export class StoreCollection<Stores extends BaseStores> {
 
   public getStore<ST extends keyof Stores>(storeName: ST): Stores[ST] {
     return this.stores[storeName]
+  }
+
+  public group() {
+    this.isGroup = true
+  }
+
+  public groupEnd() {
+    this.isGroupEnding = true
+    this.isGroup = false
+    const stores = Object.values(this.stores)
+    stores.forEach((store, i) => {
+      if (stores.length - 1 === i) {
+        this.isGroupEnding = false
+      }
+      store.groupEnd()
+    })
   }
 }

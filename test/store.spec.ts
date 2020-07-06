@@ -19,6 +19,14 @@ const counterStore = new Store({
     },
   },
 
+  actions: {
+    incrementThree(amount: number) {
+      counterStore.commit.increment(amount)
+      counterStore.commit.increment(amount)
+      counterStore.commit.increment(amount)
+    },
+  },
+
   getters: {
     countPlus(state, plus: number) {
       return state.count + plus
@@ -201,6 +209,63 @@ describe('Store and StoreCollection', () => {
 
     expect(actual).toBe(expected)
     expect(actualFromChild).toBe(expected)
+  })
+
+  test('action grouped', () => {
+    const mockFunc = jest.fn()
+    counterStore.subscribe(mockFunc)
+    counterStore.dispatch.incrementThree(1)
+
+    expect(mockFunc).toBeCalledTimes(1)
+  })
+
+  test('reducer group', () => {
+    const mockFunc = jest.fn()
+    counterStore.subscribe(mockFunc)
+
+    counterStore.group()
+    counterStore.commit.increment()
+    counterStore.commit.increment()
+    counterStore.commit.increment()
+    counterStore.commit.increment()
+    counterStore.commit.increment()
+    counterStore.groupEnd()
+
+    expect(mockFunc).toBeCalledTimes(1)
+  })
+
+  test('store group', () => {
+    const mockFunc = jest.fn()
+    const mockCounterFunc = jest.fn()
+    const mockTodoFunc = jest.fn()
+    store.subscribe(mockFunc)
+    counterStore.subscribe(mockCounterFunc)
+    todoStore.subscribe(mockTodoFunc)
+
+    store.group()
+    counterStore.commit.increment()
+    todoStore.commit.addTodo({ text: '', completed: false })
+    store.groupEnd()
+
+    expect(mockFunc).toBeCalledTimes(1)
+    expect(mockCounterFunc).toBeCalledTimes(1)
+    expect(mockTodoFunc).toBeCalledTimes(1)
+  })
+
+  test('store not group', () => {
+    const mockFunc = jest.fn()
+    const mockCounterFunc = jest.fn()
+    const mockTodoFunc = jest.fn()
+    store.subscribe(mockFunc)
+    counterStore.subscribe(mockCounterFunc)
+    todoStore.subscribe(mockTodoFunc)
+
+    counterStore.commit.increment()
+    todoStore.commit.addTodo({ text: '', completed: false })
+
+    expect(mockFunc).toBeCalledTimes(2)
+    expect(mockCounterFunc).toBeCalledTimes(1)
+    expect(mockTodoFunc).toBeCalledTimes(1)
   })
 
   test('resetState', async () => {
