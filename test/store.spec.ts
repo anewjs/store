@@ -1,4 +1,4 @@
-import Store, { StoreCollection } from '..'
+import Store, { StoreCollection, createActionWithStore, createReducer, createGetter } from '..'
 
 const counterStore = new Store({
   state: {
@@ -20,7 +20,7 @@ const counterStore = new Store({
   },
 
   actions: {
-    incrementThree(amount: number) {
+    incrementThree: (amount: number) => {
       counterStore.reducers.increment(amount)
       counterStore.reducers.increment(amount)
       counterStore.reducers.increment(amount)
@@ -48,16 +48,28 @@ const todoStore = new Store({
   },
 })
 
-export const incrementSync = (amount: number) => {
+const increment = createReducer(counterStore)((state, amount: number = 1) => {
+  if (amount < 100) {
+    return {
+      count: state.count + amount,
+    }
+  }
+})
+
+const countPlus = createGetter(counterStore)((state, plus: number) => {
+  return state.count + plus
+})
+
+const incrementSync = createActionWithStore(counterStore)((store, amount: number) => {
   return new Promise(resolve => {
     setTimeout(() => {
-      store.reducers.counter.increment(amount)
+      store.reducers.increment(amount)
       resolve()
     }, 1000)
   })
-}
+})
 
-export const incrementSyncFromChild = (amount: number) => {
+const incrementSyncFromChild = (amount: number) => {
   return new Promise(resolve => {
     setTimeout(() => {
       counterStore.reducers.increment(amount)
@@ -66,21 +78,12 @@ export const incrementSyncFromChild = (amount: number) => {
   })
 }
 
-export const addTodoSync = (todo: { text: string; completed: boolean }) => {
-  return new Promise(resolve => {
-    setTimeout(() => {
-      todoStore.reducers.addTodo(todo)
-      resolve()
-    }, 1000)
-  })
-}
-
-export const store = new StoreCollection({
+const store = new StoreCollection({
   counter: counterStore,
   todo: todoStore,
 })
 
-export const wrapperStore = new StoreCollection({
+const wrapperStore = new StoreCollection({
   wrapped: store,
 })
 
@@ -106,6 +109,7 @@ describe('Store and StoreCollection', () => {
   })
 
   test('reducers', () => {
+    increment()
     const before = store.state.counter.count
     const beforeFromChild = counterStore.state.count
     store.reducers.counter.increment()
@@ -113,8 +117,8 @@ describe('Store and StoreCollection', () => {
     const after = store.state.counter.count
     const afterFromChild = counterStore.state.count
     const afterFromWrapper = wrapperStore.state.wrapped.counter.count
-    const expectedBefore = 0
-    const expectedAfter = 2
+    const expectedBefore = 1
+    const expectedAfter = 3
 
     expect(before).toBe(expectedBefore)
     expect(after).toBe(expectedAfter)
@@ -126,9 +130,11 @@ describe('Store and StoreCollection', () => {
   test('getters', () => {
     const before = store.getters.counter.countPlus(1)
     const beforeFromChild = counterStore.getters.countPlus(1)
+    const beforeGettersCreator = countPlus(1)
     store.reducers.counter.increment()
     const after = store.getters.counter.countPlus(1)
     const afterFromChild = counterStore.getters.countPlus(1)
+    const afterGettersCreator = countPlus(1)
     const expectedBefore = 1
     const expectedAfter = 2
 
@@ -136,13 +142,15 @@ describe('Store and StoreCollection', () => {
     expect(after).toBe(expectedAfter)
     expect(beforeFromChild).toBe(expectedBefore)
     expect(afterFromChild).toBe(expectedAfter)
+    expect(beforeGettersCreator).toBe(expectedBefore)
+    expect(afterGettersCreator).toBe(expectedAfter)
   })
 
   test('subscribe', () => {
     const mockFunc = jest.fn()
     const mockFuncForCounter = jest.fn()
     const mockFuncForTodo = jest.fn()
-    store.subscribe(mockFunc)
+    const unsubscribe = store.subscribe(mockFunc)
     counterStore.subscribe(mockFuncForCounter)
     todoStore.subscribe(mockFuncForTodo)
     store.reducers.counter.increment(1)
@@ -150,6 +158,8 @@ describe('Store and StoreCollection', () => {
     store.reducers.counter.increment(3)
     store.reducers.counter.increment(100)
     store.reducers.counter.increment(101)
+    unsubscribe()
+    store.reducers.counter.increment(3)
     expect(mockFunc).toBeCalledTimes(3)
     expect(mockFunc).toBeCalledWith(
       expect.objectContaining({
@@ -175,7 +185,7 @@ describe('Store and StoreCollection', () => {
         storeName: 'counter',
       })
     )
-    expect(mockFuncForCounter).toBeCalledTimes(3)
+    expect(mockFuncForCounter).toBeCalledTimes(4)
     expect(mockFuncForCounter).toBeCalledWith(
       expect.objectContaining({
         args: [1],
@@ -215,8 +225,9 @@ describe('Store and StoreCollection', () => {
     const mockFunc = jest.fn()
     counterStore.subscribe(mockFunc)
     counterStore.actions.incrementThree(1)
+    store.actions.counter.incrementThree(1)
 
-    expect(mockFunc).toBeCalledTimes(1)
+    expect(mockFunc).toBeCalledTimes(2)
   })
 
   test('reducer group', () => {

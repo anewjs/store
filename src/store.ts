@@ -38,7 +38,7 @@ export default class Store<
   private _collectionKey?: string
   private _state: State
   private _initialState: State
-  private _reducers: Reducers
+  private _reducers?: Reducers
   private _actions?: Actions
   private _getters?: Getters
   private _subscriptions: Array<
@@ -76,7 +76,7 @@ export default class Store<
     [GKey in keyof Getters]: (...args: Args<Getters[GKey]>) => ReturnType<Getters[GKey]>
   }
 
-  constructor(config: { state: State; reducers: Reducers; getters?: Getters; actions?: Actions }) {
+  constructor(config: { state: State; reducers?: Reducers; getters?: Getters; actions?: Actions }) {
     this._state = config.state
     this._initialState = { ...config.state }
     this._reducers = config.reducers
@@ -84,9 +84,10 @@ export default class Store<
     this._actions = config.actions
     this._subscriptions = []
     this._nextSubscriptions = this._subscriptions
-    this.initCommit()
-    this.initGet()
-    this.initDispatch()
+
+    this.initReducers()
+    this.initGetters()
+    this.initActions()
   }
 
   // @ts-ignore
@@ -98,37 +99,26 @@ export default class Store<
     this._collectionKey = collectionKey
   }
 
-  private initCommit() {
-    Object.entries(this._reducers).forEach(([reducerKey, reducer]) => {
-      this.reducers[reducerKey as keyof Reducers] = (...args: Args<typeof reducer>) => {
-        const result = reducer(this._state, ...args)
-        if (result && result !== this._state) {
-          this.setState(result, reducerKey, args)
-        }
-        return result as ReturnType<Reducers[keyof Reducers]>
-      }
-    })
-  }
-
-  private initDispatch() {
-    if (this._actions) {
-      Object.entries(this._actions).forEach(([actionKey, action]) => {
-        this.actions[actionKey as keyof Actions] = ((...args: any[]) => {
-          this.group()
-          const result = action(this._state, ...args)
-          this.groupEnd(actionKey, args)
-          return result
-        }) as any
+  private initReducers() {
+    if (this._reducers) {
+      Object.entries(this._reducers).forEach(([reducerKey, reducer]) => {
+        this.reducers[reducerKey as keyof Reducers] = createReducer(this)(reducer as any) as any
       })
     }
   }
 
-  private initGet() {
+  private initActions() {
+    if (this._actions) {
+      Object.entries(this._actions).forEach(([actionKey, action]) => {
+        this.actions[actionKey as keyof Actions] = createAction(this)(action) as any
+      })
+    }
+  }
+
+  private initGetters() {
     if (this._getters) {
       Object.entries(this._getters).forEach(([getterKey, getter]) => {
-        this.getters[getterKey as keyof Getters] = (...args: Args<typeof getter>) => {
-          return getter(this._state, ...args)
-        }
+        this.getters[getterKey as keyof Getters] = createGetter(this)(getter as any) as any
       })
     }
   }
@@ -244,19 +234,12 @@ export class StoreCollection<Stores extends BaseStores> {
   private isGroupEnding: boolean = false
   private _collection?: StoreCollection<any>
   private _collectionKey?: string
-  private _state = {} as {
-    [STKey in keyof Stores]: Stores[STKey]['state']
-  }
-  private _initialState = {} as {
-    [STKey in keyof Stores]: Stores[STKey]['initialState']
-  }
+  private _state = {} as { [STKey in keyof Stores]: Stores[STKey]['state'] }
+  private _initialState = {} as { [STKey in keyof Stores]: Stores[STKey]['initialState'] }
 
-  public reducers = {} as {
-    [STKey in keyof Stores]: Stores[STKey]['reducers']
-  }
-  public getters = {} as {
-    [STKey in keyof Stores]: Stores[STKey]['getters']
-  }
+  public actions = {} as { [STKey in keyof Stores]: Stores[STKey]['actions'] }
+  public reducers = {} as { [STKey in keyof Stores]: Stores[STKey]['reducers'] }
+  public getters = {} as { [STKey in keyof Stores]: Stores[STKey]['getters'] }
 
   constructor(private stores: Stores) {
     Object.keys(this.stores).forEach((storeName: keyof Stores) => {
@@ -265,6 +248,7 @@ export class StoreCollection<Stores extends BaseStores> {
       this._state[storeName] = store.state
       this._initialState[storeName] = store.initialState
       this.reducers[storeName] = store.reducers
+      this.actions[storeName] = store.actions
       this.getters[storeName] = store.getters
     })
   }
@@ -319,6 +303,19 @@ export class StoreCollection<Stores extends BaseStores> {
     return () => unsubscribes.map(unsubscribe => unsubscribe())
   }
 
+  public setState(
+    state: Partial<{ [STKey in keyof Stores]: Partial<Stores[STKey]['state']> }>,
+    reducerName: string = 'setState',
+    args: any[] = []
+  ) {
+    this.group()
+    Object.entries(state).forEach(([storeName, storeState]) => {
+      const store = this.getStore(storeName)
+      if (store) store.setState(storeState as any, `${reducerName}/${storeName}`, args)
+    })
+    this.groupEnd()
+  }
+
   public resetState() {
     Object.keys(this.stores).forEach((storeName: keyof Stores) => {
       this.getStore(storeName).resetState()
@@ -356,5 +353,59 @@ export class StoreCollection<Stores extends BaseStores> {
       }
       store.groupEnd()
     })
+  }
+}
+
+/**
+ * -----------------------
+ * Store Prop Creators
+ * -----------------------
+ */
+
+export function createActionWithStore<S extends Store<any, any, any, any> | StoreCollection<any>>(
+  store: S
+) {
+  return <A extends (store: S, ...args: any) => any>(action: A) => {
+    return (...args: Args<A>): ReturnType<A> => {
+      store.group()
+      const result = action(store, ...(args as any))
+      store.groupEnd(action.name, args)
+      return result
+    }
+  }
+}
+
+export function createAction<S extends Store<any, any, any, any> | StoreCollection<any>>(store: S) {
+  return <A extends (...args: any) => any>(action: A) => {
+    return (...args: Parameters<A>): ReturnType<A> => {
+      store.group()
+      const result = action(...(args as any))
+      store.groupEnd(action.name, args)
+      return result
+    }
+  }
+}
+
+export function createReducer<S extends Store<any, any, any, any> | StoreCollection<any>>(
+  store: S
+) {
+  return <R extends (state: S['state'], ...args: any) => Parameters<S['setState']>[0] | void>(
+    reducer: R
+  ) => {
+    return (...args: Args<typeof reducer>): ReturnType<R> => {
+      const result = reducer(store.state, ...(args as any))
+      if (result && result !== store.state) {
+        store.setState(result, reducer.name, args)
+      }
+      return result as any
+    }
+  }
+}
+
+export function createGetter<S extends Store<any, any, any, any> | StoreCollection<any>>(store: S) {
+  return <G extends (state: S['state'], ...args: any) => any>(getter: G) => {
+    return (...args: Args<typeof getter>): ReturnType<G> => {
+      return getter(store.state, ...(args as any))
+    }
   }
 }
