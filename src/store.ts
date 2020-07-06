@@ -362,6 +362,10 @@ export class StoreCollection<Stores extends BaseStores> {
  * -----------------------
  */
 
+export function createStore<State extends BaseState>(state: State) {
+  return new Store({ state })
+}
+
 export function createActionWithStore<S extends Store<any, any, any, any> | StoreCollection<any>>(
   store: S
 ) {
