@@ -143,10 +143,13 @@ export default class Store<
     args: any[]
     stateChange?: Readonly<Partial<State>>
   }) {
-    if (
-      !this.isGroup &&
-      ((this.collection && !(this.collection as any).isGroup) || !this.collection)
-    ) {
+    let isCollectionGroup = false
+
+    try {
+      isCollectionGroup = this.collection && (this.collection as any).isGroup
+    } catch (error) {}
+
+    if (!this.isGroup && !isCollectionGroup) {
       const listeners = (this._subscriptions = this._nextSubscriptions)
       listeners.forEach(listener => listener({ action, reducer, args, stateChange }))
     }
