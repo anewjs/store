@@ -21,9 +21,9 @@ const counterStore = new Store({
 
   actions: {
     incrementThree(amount: number) {
-      counterStore.commit.increment(amount)
-      counterStore.commit.increment(amount)
-      counterStore.commit.increment(amount)
+      counterStore.reducers.increment(amount)
+      counterStore.reducers.increment(amount)
+      counterStore.reducers.increment(amount)
     },
   },
 
@@ -51,7 +51,7 @@ const todoStore = new Store({
 export const incrementSync = (amount: number) => {
   return new Promise(resolve => {
     setTimeout(() => {
-      store.commit.counter.increment(amount)
+      store.reducers.counter.increment(amount)
       resolve()
     }, 1000)
   })
@@ -60,7 +60,7 @@ export const incrementSync = (amount: number) => {
 export const incrementSyncFromChild = (amount: number) => {
   return new Promise(resolve => {
     setTimeout(() => {
-      counterStore.commit.increment(amount)
+      counterStore.reducers.increment(amount)
       resolve()
     }, 1000)
   })
@@ -69,7 +69,7 @@ export const incrementSyncFromChild = (amount: number) => {
 export const addTodoSync = (todo: { text: string; completed: boolean }) => {
   return new Promise(resolve => {
     setTimeout(() => {
-      todoStore.commit.addTodo(todo)
+      todoStore.reducers.addTodo(todo)
       resolve()
     }, 1000)
   })
@@ -105,11 +105,11 @@ describe('Store and StoreCollection', () => {
     expect(store.state.counter).toEqual(counterStore.state)
   })
 
-  test('commit', () => {
+  test('reducers', () => {
     const before = store.state.counter.count
     const beforeFromChild = counterStore.state.count
-    store.commit.counter.increment()
-    counterStore.commit.increment()
+    store.reducers.counter.increment()
+    counterStore.reducers.increment()
     const after = store.state.counter.count
     const afterFromChild = counterStore.state.count
     const afterFromWrapper = wrapperStore.state.wrapped.counter.count
@@ -123,12 +123,12 @@ describe('Store and StoreCollection', () => {
     expect(afterFromWrapper).toBe(expectedAfter)
   })
 
-  test('get', () => {
-    const before = store.get.counter.countPlus(1)
-    const beforeFromChild = counterStore.get.countPlus(1)
-    store.commit.counter.increment()
-    const after = store.get.counter.countPlus(1)
-    const afterFromChild = counterStore.get.countPlus(1)
+  test('getters', () => {
+    const before = store.getters.counter.countPlus(1)
+    const beforeFromChild = counterStore.getters.countPlus(1)
+    store.reducers.counter.increment()
+    const after = store.getters.counter.countPlus(1)
+    const afterFromChild = counterStore.getters.countPlus(1)
     const expectedBefore = 1
     const expectedAfter = 2
 
@@ -145,11 +145,11 @@ describe('Store and StoreCollection', () => {
     store.subscribe(mockFunc)
     counterStore.subscribe(mockFuncForCounter)
     todoStore.subscribe(mockFuncForTodo)
-    store.commit.counter.increment(1)
-    store.commit.counter.increment(2)
-    store.commit.counter.increment(3)
-    store.commit.counter.increment(100)
-    store.commit.counter.increment(101)
+    store.reducers.counter.increment(1)
+    store.reducers.counter.increment(2)
+    store.reducers.counter.increment(3)
+    store.reducers.counter.increment(100)
+    store.reducers.counter.increment(101)
     expect(mockFunc).toBeCalledTimes(3)
     expect(mockFunc).toBeCalledWith(
       expect.objectContaining({
@@ -214,7 +214,7 @@ describe('Store and StoreCollection', () => {
   test('action grouped', () => {
     const mockFunc = jest.fn()
     counterStore.subscribe(mockFunc)
-    counterStore.dispatch.incrementThree(1)
+    counterStore.actions.incrementThree(1)
 
     expect(mockFunc).toBeCalledTimes(1)
   })
@@ -224,11 +224,11 @@ describe('Store and StoreCollection', () => {
     counterStore.subscribe(mockFunc)
 
     counterStore.group()
-    counterStore.commit.increment()
-    counterStore.commit.increment()
-    counterStore.commit.increment()
-    counterStore.commit.increment()
-    counterStore.commit.increment()
+    counterStore.reducers.increment()
+    counterStore.reducers.increment()
+    counterStore.reducers.increment()
+    counterStore.reducers.increment()
+    counterStore.reducers.increment()
     counterStore.groupEnd()
 
     expect(mockFunc).toBeCalledTimes(1)
@@ -243,8 +243,8 @@ describe('Store and StoreCollection', () => {
     todoStore.subscribe(mockTodoFunc)
 
     store.group()
-    counterStore.commit.increment()
-    todoStore.commit.addTodo({ text: '', completed: false })
+    counterStore.reducers.increment()
+    todoStore.reducers.addTodo({ text: '', completed: false })
     store.groupEnd()
 
     expect(mockFunc).toBeCalledTimes(1)
@@ -260,8 +260,8 @@ describe('Store and StoreCollection', () => {
     counterStore.subscribe(mockCounterFunc)
     todoStore.subscribe(mockTodoFunc)
 
-    counterStore.commit.increment()
-    todoStore.commit.addTodo({ text: '', completed: false })
+    counterStore.reducers.increment()
+    todoStore.reducers.addTodo({ text: '', completed: false })
 
     expect(mockFunc).toBeCalledTimes(2)
     expect(mockCounterFunc).toBeCalledTimes(1)
@@ -276,8 +276,8 @@ describe('Store and StoreCollection', () => {
     store.subscribe(storeMock)
     todoStore.subscribe(todoMock)
     const beforeCommit = store.state
-    store.commit.counter.increment()
-    store.commit.todo.addTodo({ text: 'test', completed: false })
+    store.reducers.counter.increment()
+    store.reducers.todo.addTodo({ text: 'test', completed: false })
     const afterCommit = store.state
     counterStore.resetState()
     const afterReset = store.state

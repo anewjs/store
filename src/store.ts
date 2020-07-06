@@ -68,11 +68,11 @@ export default class Store<
     }) => any
   >
 
-  public dispatch = {} as Actions
-  public commit = {} as {
+  public actions = {} as Actions
+  public reducers = {} as {
     [RKey in keyof Reducers]: (...args: Args<Reducers[RKey]>) => ReturnType<Reducers[RKey]>
   }
-  public get = {} as {
+  public getters = {} as {
     [GKey in keyof Getters]: (...args: Args<Getters[GKey]>) => ReturnType<Getters[GKey]>
   }
 
@@ -100,7 +100,7 @@ export default class Store<
 
   private initCommit() {
     Object.entries(this._reducers).forEach(([reducerKey, reducer]) => {
-      this.commit[reducerKey as keyof Reducers] = (...args: Args<typeof reducer>) => {
+      this.reducers[reducerKey as keyof Reducers] = (...args: Args<typeof reducer>) => {
         const result = reducer(this._state, ...args)
         if (result && result !== this._state) {
           this.setState(result, reducerKey, args)
@@ -113,7 +113,7 @@ export default class Store<
   private initDispatch() {
     if (this._actions) {
       Object.entries(this._actions).forEach(([actionKey, action]) => {
-        this.dispatch[actionKey as keyof Actions] = ((...args: any[]) => {
+        this.actions[actionKey as keyof Actions] = ((...args: any[]) => {
           this.group()
           const result = action(this._state, ...args)
           this.groupEnd(actionKey, args)
@@ -126,7 +126,7 @@ export default class Store<
   private initGet() {
     if (this._getters) {
       Object.entries(this._getters).forEach(([getterKey, getter]) => {
-        this.get[getterKey as keyof Getters] = (...args: Args<typeof getter>) => {
+        this.getters[getterKey as keyof Getters] = (...args: Args<typeof getter>) => {
           return getter(this._state, ...args)
         }
       })
@@ -251,11 +251,11 @@ export class StoreCollection<Stores extends BaseStores> {
     [STKey in keyof Stores]: Stores[STKey]['initialState']
   }
 
-  public commit = {} as {
-    [STKey in keyof Stores]: Stores[STKey]['commit']
+  public reducers = {} as {
+    [STKey in keyof Stores]: Stores[STKey]['reducers']
   }
-  public get = {} as {
-    [STKey in keyof Stores]: Stores[STKey]['get']
+  public getters = {} as {
+    [STKey in keyof Stores]: Stores[STKey]['getters']
   }
 
   constructor(private stores: Stores) {
@@ -264,8 +264,8 @@ export class StoreCollection<Stores extends BaseStores> {
       ;(store as any).setCollection(this, storeName)
       this._state[storeName] = store.state
       this._initialState[storeName] = store.initialState
-      this.commit[storeName] = store.commit
-      this.get[storeName] = store.get
+      this.reducers[storeName] = store.reducers
+      this.getters[storeName] = store.getters
     })
   }
 
