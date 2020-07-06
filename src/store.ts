@@ -102,7 +102,10 @@ export default class Store<
   private initReducers() {
     if (this._reducers) {
       Object.entries(this._reducers).forEach(([reducerKey, reducer]) => {
-        this.reducers[reducerKey as keyof Reducers] = createReducer(this)(reducer as any) as any
+        this.reducers[reducerKey as keyof Reducers] = createReducer(this)(
+          reducer as any,
+          reducerKey
+        ) as any
       })
     }
   }
@@ -110,7 +113,7 @@ export default class Store<
   private initActions() {
     if (this._actions) {
       Object.entries(this._actions).forEach(([actionKey, action]) => {
-        this.actions[actionKey as keyof Actions] = createAction(this)(action) as any
+        this.actions[actionKey as keyof Actions] = createAction(this)(action, actionKey) as any
       })
     }
   }
@@ -380,22 +383,25 @@ export function createStoreCreator<S extends Store<any, any, any, any> | StoreCo
 export function createActionWithStore<S extends Store<any, any, any, any> | StoreCollection<any>>(
   store: S
 ) {
-  return <A extends (store: S, ...args: any) => any>(action: A) => {
+  return <A extends (store: S, ...args: any) => any>(
+    action: A,
+    actionName: string = action.name
+  ) => {
     return (...args: Args<A>): ReturnType<A> => {
       store.group()
       const result = action(store, ...(args as any))
-      store.groupEnd(action.name, args)
+      store.groupEnd(actionName, args)
       return result
     }
   }
 }
 
 export function createAction<S extends Store<any, any, any, any> | StoreCollection<any>>(store: S) {
-  return <A extends (...args: any) => any>(action: A) => {
+  return <A extends (...args: any) => any>(action: A, actionName: string = action.name) => {
     return (...args: Parameters<A>): ReturnType<A> => {
       store.group()
       const result = action(...(args as any))
-      store.groupEnd(action.name, args)
+      store.groupEnd(actionName, args)
       return result
     }
   }
@@ -405,12 +411,13 @@ export function createReducer<S extends Store<any, any, any, any> | StoreCollect
   store: S
 ) {
   return <R extends (state: S['state'], ...args: any) => Parameters<S['setState']>[0] | void>(
-    reducer: R
+    reducer: R,
+    reducerName: string = reducer.name
   ) => {
     return (...args: Args<typeof reducer>): ReturnType<R> => {
       const result = reducer(store.state, ...(args as any))
       if (result && result !== store.state) {
-        store.setState(result, reducer.name, args)
+        store.setState(result, reducerName, args)
       }
       return result as any
     }
