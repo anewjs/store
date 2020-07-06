@@ -366,6 +366,17 @@ export function createStore<State extends BaseState>(state: State) {
   return new Store({ state })
 }
 
+export function createStoreCreator<S extends Store<any, any, any, any> | StoreCollection<any>>(
+  store: S
+) {
+  return {
+    createActionWithStore: createActionWithStore(store),
+    createAction: createAction(store),
+    createReducer: createReducer(store),
+    createGetter: createGetter(store),
+  }
+}
+
 export function createActionWithStore<S extends Store<any, any, any, any> | StoreCollection<any>>(
   store: S
 ) {
