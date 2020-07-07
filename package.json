@@ -51,7 +51,6 @@
     "prepublishOnly": "yarn run clean && yarn run check-types && yarn run format:check && yarn run lint && yarn test"
   },
   "dependencies": {
-    "@babel/plugin-proposal-class-properties": "^7.10.4",
     "@babel/runtime": "^7.9.2"
   },
   "devDependencies": {
@@ -59,6 +58,7 @@
     "@babel/core": "^7.9.0",
     "@babel/node": "^7.8.7",
     "@babel/plugin-external-helpers": "^7.8.3",
+    "@babel/plugin-proposal-class-properties": "^7.10.4",
     "@babel/plugin-proposal-object-rest-spread": "^7.9.5",
     "@babel/plugin-proposal-private-methods": "^7.10.4",
     "@babel/plugin-transform-runtime": "^7.9.0",
