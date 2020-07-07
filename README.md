@@ -1,4 +1,4 @@
-# Anew Store
+# `@anew/store`
 
 > A lightweight robust predictable state container
 
