@@ -25,6 +25,8 @@ const counterStore = new Store({
       counterStore.reducers.increment(amount)
       counterStore.reducers.increment(amount)
     },
+
+    dummy: () => {},
   },
 
   getters: {
@@ -158,6 +160,7 @@ describe('Store and StoreCollection', () => {
     store.reducers.counter.increment(3)
     store.reducers.counter.increment(100)
     store.reducers.counter.increment(101)
+    store.actions.counter.dummy()
     unsubscribe()
     store.reducers.counter.increment(3)
     expect(mockFunc).toBeCalledTimes(3)
