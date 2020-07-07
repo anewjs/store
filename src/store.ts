@@ -34,6 +34,7 @@ export default class Store<
   Actions extends BaseActions
 > {
   private isGroup: boolean = false
+  private isStateChange: boolean = false
   private _collection?: StoreCollection<any>
   private _collectionKey?: string
   private _state: State
@@ -149,7 +150,8 @@ export default class Store<
       isCollectionGroup = this.collection && (this.collection as any).isGroup
     } catch (error) {}
 
-    if (!this.isGroup && !isCollectionGroup) {
+    if (this.isStateChange && !this.isGroup && !isCollectionGroup) {
+      this.isStateChange = false
       const listeners = (this._subscriptions = this._nextSubscriptions)
       listeners.forEach(listener => listener({ action, reducer, args, stateChange }))
     }
@@ -193,6 +195,7 @@ export default class Store<
   }
 
   public setState(state: Partial<State>, reducerName: string = 'setState', args: any[] = []) {
+    this.isStateChange = true
     this.notifyCollection((this._state = { ...this._state, ...state }))
     this.notifiySubscriptions({ reducer: reducerName, args, stateChange: state })
   }
