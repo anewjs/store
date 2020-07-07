@@ -20,16 +20,77 @@ for yarn users, run:
 yarn add @anew/store
 ```
 
-## Docs
+## Usage
 
 ```js
-import Store from '@anew/store'
+import { createStore, createReducer, createAction, createGetter } from '@anew/store'
 
-const store = new Store({
+const CounterStore = createStore({ count: 1 })
+
+// Property creators use the currying technique to create props for the store
+const createCounterReducer = createReducer(CounterStore)
+const createCounterAction = createAction(CounterStore)
+// `createActionWithStore` is exactly the same as `createAction` but passes the store as
+// the first argument for convenience (saves from an extra import)
+const createCounterActionWithStore = createActionWithStore(CounterStore)
+const createCounteGetter = createGetter(CounterStore)
+
+// CounteStore reducers for updating using pure functions
+const increment = createCounterReducer((state, add: number = 1) => ({
+  count: state.count + add,
+}))
+
+const decrement = createCounterReducer((state, minus: number = 1) => ({
+  count: state.count - minus,
+}))
+
+// CounterStore actions for calling reducers asynchronously.
+// Multiple reducer calls are batched and trigger a single change event when possibly
+const incrementSync = createCounterAction(async (...args: any) => {
+  // The following reducer calls are batched and trigger one change event
+  increment()
+  increment()
+
+  const add = await someExampleFetchMethod()
+
+  // The follow reducer calls are not batched and trigger 2 change events
+  // since they are called after the action returns and once the await resolves
+  increment(add)
+  increment(add)
+
+  // You can explicitly batch reducers calls as follows:
+  CounterStore.group()
+  increment(add)
+  increment(add)
+  CounterStore.groupEnd()
+})
+
+// CounterStore getters for getting a state prop or some derived state value
+const getCountMult = createCounteGetter((state, mult: number = 2) => {
+  return state.count * mult
+})
+```
+
+## Docs
+
+There are two ways to create a store:
+
+1. Creating a store instance along with it's state, reducers, actions, and getters under the same instance.
+2. Using the `createStore` function that takes the state as its only argument leaving out reducers, actions, and getters to be defining funtionally using the following methods, `createReducer`, `createAction` or `createActionWithStore`, and `createGetter`.
+
+Both approaches have their pros and cons. Using the store instances ensures store specific logic is strongly coupled and is always shipped together making it easier to access functionality. Using the (preferred) functional approach decouples the store allowing for separation of logic and allows you to import functionality as needed.
+
+```js
+import Store, { createStore } from '@anew/store'
+
+const storeA = new Store({
     state: Object,
-    reducers: Object,
+    reducers?: Object,
+    actions?: Object,
     getters?: Object,
 })
+
+const storeB = createStore(state: Object)
 ```
 
 ### Parameters
