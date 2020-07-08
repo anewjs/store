@@ -42,7 +42,7 @@ export default class Store<
   private _reducers?: Reducers
   private _actions?: Actions
   private _getters?: Getters
-  private _subscriptions: Array<
+  private _subscriptions: null | Array<
     ({
       action,
       reducer,
@@ -189,6 +189,7 @@ export default class Store<
       this.ensureCanMutateNextListeners()
       const index = this._nextSubscriptions.indexOf(listener)
       this._nextSubscriptions.splice(index, 1)
+      this._subscriptions = null
     }
 
     return unsubscribe
