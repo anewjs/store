@@ -102,27 +102,27 @@ export default class Store<
 
   private initReducers() {
     if (this._reducers) {
+      const cReducer = createReducer(this)
       Object.entries(this._reducers).forEach(([reducerKey, reducer]) => {
-        this.reducers[reducerKey as keyof Reducers] = createReducer(this)(
-          reducer as any,
-          reducerKey
-        ) as any
+        this.reducers[reducerKey as keyof Reducers] = cReducer(reducer as any, reducerKey) as any
       })
     }
   }
 
   private initActions() {
     if (this._actions) {
+      const cAction = createAction(this)
       Object.entries(this._actions).forEach(([actionKey, action]) => {
-        this.actions[actionKey as keyof Actions] = createAction(this)(action, actionKey) as any
+        this.actions[actionKey as keyof Actions] = cAction(action, actionKey) as any
       })
     }
   }
 
   private initGetters() {
     if (this._getters) {
+      const cGetter = createGetter(this)
       Object.entries(this._getters).forEach(([getterKey, getter]) => {
-        this.getters[getterKey as keyof Getters] = createGetter(this)(getter as any) as any
+        this.getters[getterKey as keyof Getters] = cGetter(getter as any) as any
       })
     }
   }
