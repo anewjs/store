@@ -99,8 +99,11 @@ const storeB = createStore(state: Object)
 
 `reducers`: pure functions, defined under a strict namespace, that return the next state tree for a specific store. Reducers receive the store's current state tree with an optional payload list as parameters. In addition, reducers that fall under an outside namepsace can also be defined inside the store and get passed both the current and defined namespace states.
 
+`actions`: impure functions that handle operations that fall inside and outside the store. They are mainly used to handle **async** operations that call reducers upon completion. Actions receive an exposed store object with public properties.
+
+`getters`: pure functions that return a state slice or some derived state.
+
 ```js
-// Creation
 const store = new Store({
   state: {
     count: 1,
@@ -108,39 +111,40 @@ const store = new Store({
   },
 
   reducers: {
-    inc: (state, add: number = 1) => ({
-      count: state.count + add,
-    }),
+    inc(state, add: number = 1) {
+      return {
+        count: state.count + add,
+      }
+    },
 
-    push: (state, add: number = 1) => ({
-      items: [...state.items, add],
-    }),
+    push(state, add: number = 1) {
+      return {
+        items: [...state.items, add],
+      }
+    },
   },
-})
 
-// Usage
-store.commit.inc(2) // => { count: 3 }
-store.commit.push() // => { items: [1] }
-```
-
-`getters`: pure functions that return a state slice or some derived state.
-
-```js
-// Creation
-const store = new Store({
-  state: {
-    someStateProp: 1,
-    anotherStateProp: 2,
+  actions: {
+    incSync(add: number) {
+      setTimeout(() => {
+        store.reducers.inc(add)
+      }, 1000)
+    },
   },
 
   getters: {
-    someStateProp: state => state.someStateProp,
-    anotherStateProp: state => state.anotherStateProp,
+    countMult(state, mult: number = 2) {
+      return state.count * mult
+    },
   },
 })
 
-// Usage
-store.get.someStaateProp() // => 1
+store.reducers.inc(2) // => { count: 3 }
+store.reducers.push() // => { items: [1] }
+
+store.actions.incSync(1) // => { count: 4 }
+
+store.getters.countMult(3) // => 12
 ```
 
 ## Inspiration
