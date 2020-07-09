@@ -23,42 +23,52 @@ yarn add @anew/store
 ## Usage
 
 ```js
-import { createStore, createReducer, createAction, createGetter } from '@anew/store'
+import {
+  createStore,
+  createReducerCreator,
+  createActionCreator,
+  createGetterCreator,
+} from '@anew/store'
 
 const CounterStore = createStore({ count: 1 })
 
 // Property creators use the currying technique to create props for the store
-const createCounterReducer = createReducer(CounterStore)
-const createCounterAction = createAction(CounterStore)
-// `createActionWithStore` is exactly the same as `createAction` but passes the store as
-// the first argument for convenience (saves from an extra import)
-const createCounterActionWithStore = createActionWithStore(CounterStore)
-const createCounteGetter = createGetter(CounterStore)
+const createCounterReducer = createReducerCreator(CounterStore)
+const createCounterAction = createActionCreator(CounterStore)
+const createCounteGetter = createGetterCreator(CounterStore)
 
-// CounteStore reducers for updating using pure functions
+// A CounterStore reducer for updating the state using a pure function
 const increment = createCounterReducer((state, add: number = 1) => ({
   count: state.count + add,
 }))
 
-const decrement = createCounterReducer((state, minus: number = 1) => ({
-  count: state.count - minus,
-}))
+// Alternatively you can create a named reducer, which is assigned the the
+// `methodName` arg in a subscriber.
+// `createCounterReducer('decrement', (state, minus: number = 1)) => {})`
+const decrement = createCounterReducer((state, minus: number = 1) => {
+  return {
+    count: state.count - minus,
+  }
+})
 
-// CounterStore actions for calling reducers asynchronously.
-// Multiple reducer calls are batched and trigger a single change event when possibly
+// A CounterStore action for calling reducers asynchronously.
+// As metioned in the reducer comment above, the action name
+// can be passed as the first arg: `createCountAction('<ACTION_NAME>', (...args) => {...})
 const incrementSync = createCounterAction(async (...args: any) => {
-  // The following reducer calls are batched and trigger one change event
+  // In actions, reducer calls are batched to trigger
+  // one change event when possible
   increment()
   increment()
 
   const add = await someExampleFetchMethod()
 
-  // The follow reducer calls are not batched and trigger 2 change events
+  // The following reducer calls are not batched and trigger 2 change events
   // since they are called after the action returns and once the await resolves
   increment(add)
   increment(add)
 
-  // You can explicitly batch reducers calls as follows:
+  // You can explicitly batch reducers calls by wrapping the calls with `group`
+  // and `groupEnd`: which is essentially what the action creator does.
   CounterStore.group()
   increment(add)
   increment(add)
@@ -76,9 +86,9 @@ const getCountMult = createCounteGetter((state, mult: number = 2) => {
 There are two ways to create a store:
 
 1. Creating a store instance along with it's state, reducers, actions, and getters under the same instance.
-2. Using the `createStore` function that takes the state as its only argument leaving out reducers, actions, and getters to be defining funtionally using the following methods, `createReducer`, `createAction` or `createActionWithStore`, and `createGetter`.
+2. Using the `createStore` function that takes the state as its only argument leaving out reducers, actions, and getters to be defined functionally using the following methods, `createReducerCreator`, `createActionCreator`, and `createGetterCreator`.
 
-Both approaches have their pros and cons. Using the store instances ensures store specific logic is strongly coupled and is always shipped together making it easier to access functionality. Using the (preferred) functional approach decouples the store allowing for separation of logic and allows you to import functionality as needed.
+Both approaches have their pros and cons. Using `new Store(...)` ensures store specific logic is strongly coupled and is always shipped together making it easier to access functionality. Using `createStore(...)` (preferred) decouples the store allowing for separation of logic and allows you to import functionality as needed.
 
 ```js
 import Store, { createStore } from '@anew/store'

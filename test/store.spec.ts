@@ -1,4 +1,9 @@
-import Store, { StoreCollection, createActionWithStore, createReducer, createGetter } from '..'
+import Store, {
+  StoreCollection,
+  createReducerCreator,
+  createGetterCreator,
+  createActionCreator,
+} from '..'
 
 const counterStore = new Store({
   state: {
@@ -24,6 +29,7 @@ const counterStore = new Store({
       counterStore.reducers.increment(amount)
       counterStore.reducers.increment(amount)
       counterStore.reducers.increment(amount)
+      counterStore.setState({ flag: true })
     },
 
     dummy: () => {},
@@ -50,35 +56,29 @@ const todoStore = new Store({
   },
 })
 
-const increment = createReducer(counterStore)((state, amount: number = 1) => {
-  if (amount < 100) {
-    return {
-      count: state.count + amount,
+const increment = createReducerCreator(counterStore)(
+  'incrementAlt',
+  (state, amount: number = 1) => {
+    if (amount < 100) {
+      return {
+        count: state.count + amount,
+      }
     }
   }
-})
+)
 
-const countPlus = createGetter(counterStore)((state, plus: number) => {
+const countPlus = createGetterCreator(counterStore)((state, plus: number) => {
   return state.count + plus
 })
 
-const incrementSync = createActionWithStore(counterStore)((store, amount: number) => {
-  return new Promise(resolve => {
-    setTimeout(() => {
-      store.reducers.increment(amount)
-      resolve()
-    }, 1000)
-  })
-})
-
-const incrementSyncFromChild = (amount: number) => {
+const incrementSync = createActionCreator(counterStore)((amount: number) => {
   return new Promise(resolve => {
     setTimeout(() => {
       counterStore.reducers.increment(amount)
       resolve()
     }, 1000)
   })
-}
+})
 
 const store = new StoreCollection({
   counter: counterStore,
@@ -129,6 +129,40 @@ describe('Store and StoreCollection', () => {
     expect(afterFromWrapper).toBe(expectedAfter)
   })
 
+  test('reducer named', () => {
+    const mockFuncForCounter = jest.fn()
+    counterStore.subscribe(mockFuncForCounter)
+
+    increment(15)
+
+    expect(mockFuncForCounter).toBeCalledTimes(1)
+    expect(mockFuncForCounter).toBeCalledWith(
+      expect.objectContaining({
+        methodArgs: [15],
+        methodType: 'reducer',
+        methodName: 'incrementAlt',
+        stateChange: { count: 15 },
+      })
+    )
+  })
+
+  test('action state change', () => {
+    const mockFuncForCounter = jest.fn()
+    counterStore.subscribe(mockFuncForCounter)
+
+    counterStore.actions.incrementThree(1)
+
+    expect(mockFuncForCounter).toBeCalledTimes(1)
+    expect(mockFuncForCounter).toBeCalledWith(
+      expect.objectContaining({
+        methodArgs: [1],
+        methodType: 'action',
+        methodName: 'incrementThree',
+        stateChange: { count: 3, flag: true },
+      })
+    )
+  })
+
   test('getters', () => {
     const before = store.getters.counter.countPlus(1)
     const beforeFromChild = counterStore.getters.countPlus(1)
@@ -166,24 +200,27 @@ describe('Store and StoreCollection', () => {
     expect(mockFunc).toBeCalledTimes(3)
     expect(mockFunc).toBeCalledWith(
       expect.objectContaining({
-        args: [1],
-        reducer: 'increment',
+        methodArgs: [1],
+        methodType: 'reducer',
+        methodName: 'increment',
         stateChange: { count: 1 },
         storeName: 'counter',
       })
     )
     expect(mockFunc).toBeCalledWith(
       expect.objectContaining({
-        args: [2],
-        reducer: 'increment',
+        methodArgs: [2],
+        methodType: 'reducer',
+        methodName: 'increment',
         stateChange: { count: 3 },
         storeName: 'counter',
       })
     )
     expect(mockFunc).toBeCalledWith(
       expect.objectContaining({
-        args: [3],
-        reducer: 'increment',
+        methodArgs: [3],
+        methodType: 'reducer',
+        methodName: 'increment',
         stateChange: { count: 6 },
         storeName: 'counter',
       })
@@ -191,22 +228,25 @@ describe('Store and StoreCollection', () => {
     expect(mockFuncForCounter).toBeCalledTimes(4)
     expect(mockFuncForCounter).toBeCalledWith(
       expect.objectContaining({
-        args: [1],
-        reducer: 'increment',
+        methodArgs: [1],
+        methodType: 'reducer',
+        methodName: 'increment',
         stateChange: { count: 1 },
       })
     )
     expect(mockFuncForCounter).toBeCalledWith(
       expect.objectContaining({
-        args: [2],
-        reducer: 'increment',
+        methodArgs: [2],
+        methodType: 'reducer',
+        methodName: 'increment',
         stateChange: { count: 3 },
       })
     )
     expect(mockFuncForCounter).toBeCalledWith(
       expect.objectContaining({
-        args: [3],
-        reducer: 'increment',
+        methodArgs: [3],
+        methodType: 'reducer',
+        methodName: 'increment',
         stateChange: { count: 6 },
       })
     )
@@ -215,10 +255,9 @@ describe('Store and StoreCollection', () => {
 
   test('actions', async () => {
     await incrementSync(1)
-    await incrementSyncFromChild(1)
     const actual = store.state.counter.count
     const actualFromChild = store.state.counter.count
-    const expected = 2
+    const expected = 1
 
     expect(actual).toBe(expected)
     expect(actualFromChild).toBe(expected)
