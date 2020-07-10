@@ -156,7 +156,7 @@ export default class Store<
 
   constructor(config: { state: State; reducers?: Reducers; getters?: Getters; actions?: Actions }) {
     this._state = config.state
-    this._initialState = { ...config.state }
+    this._initialState = config.state
 
     this._reducers = config.reducers
     this._getters = config.getters
