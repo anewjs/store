@@ -440,6 +440,10 @@ export function createStore<State extends BaseState>(state: State) {
   return new Store({ state })
 }
 
+export function createStoreCollection<Stores extends BaseStores>(stores: Stores) {
+  return new StoreCollection(stores)
+}
+
 export function createActionCreator<S extends AnyStore | AnyStoreCollection>(store: S) {
   function createAction<A extends (...args: any) => any>(
     actionName: string,
