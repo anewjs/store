@@ -317,9 +317,9 @@ export class StoreCollection<Stores extends BaseStores> {
   public reducers = {} as BaseStoreMergeProp<Stores, 'reducers'>
   public getters = {} as BaseStoreMergeProp<Stores, 'getters'>
 
-  constructor(private stores: Stores) {
+  constructor(public stores: Stores) {
     Object.keys(this.stores).forEach((storeName: keyof Stores) => {
-      const store = this.getStore(storeName)
+      const store = this.stores[storeName]
       ;(store as any).setCollection(this, storeName)
 
       this._state[storeName] = store.state
@@ -364,7 +364,7 @@ export class StoreCollection<Stores extends BaseStores> {
     >
   ) {
     const unsubscribes = Object.keys(this.stores).map((storeName: keyof Stores) => {
-      return this.getStore(storeName).subscribe((arg: any) => {
+      return this.stores[storeName].subscribe((arg: any) => {
         if (!this.isGroupEnding && !this.isGroup) {
           return listener({ storeName, ...arg })
         }
@@ -381,15 +381,15 @@ export class StoreCollection<Stores extends BaseStores> {
   ) {
     this.group()
     Object.entries(stateChange).forEach(([storeName, storeStateChange]) => {
-      const store = this.getStore(storeName)
+      const store = this.stores[storeName]
       if (store) store.setState(storeStateChange as any, `${methodName}/${storeName}`, methodArgs)
     })
     this.groupEnd()
   }
 
   public resetState() {
-    Object.keys(this.stores).forEach((storeName: keyof Stores) => {
-      this.getStore(storeName).resetState()
+    Object.values(this.stores).forEach(store => {
+      store.resetState()
     })
   }
 
@@ -404,10 +404,6 @@ export class StoreCollection<Stores extends BaseStores> {
   get collection(): Readonly<AnyStoreCollection> {
     if (!this._collection) throw new Error('Accessing undefined property `collection`')
     return this._collection
-  }
-
-  public getStore<ST extends keyof Stores>(storeName: ST): Stores[ST] {
-    return this.stores[storeName]
   }
 
   public group() {
